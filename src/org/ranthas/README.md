@@ -3,8 +3,12 @@
 ## Grammar definition
 ```
 program     -> declaration* EOF ;
-declaration -> varDecl | statement ;
-statement   -> exprStmt | forStmt | ifStmt | printStmt | whileStmt | block ;
+declaration -> funDecl | varDecl | statement ;
+funDecl     -> "fun" function ;
+function    -> IDENTIFIER "(" parameters? ")" block ;
+parameters  -> IDENTIFIER ( "," IDENTIFIER )* ;
+statement   -> exprStmt | forStmt | ifStmt | printStmt | returnStmt | whileStmt | block ;
+returnStmt  -> "return" expression? ";" ;
 ifStmt      -> "if" "(" expression ")" statment ( "else" statement )? ;
 forStmt     -> "for" "(" ( varDecl | exprStmt | ";" ) expression? ";" expression? ")" statement ;
 exprStmt    -> expression ";" ;
@@ -16,6 +20,8 @@ expression  -> assignment ;
 assignment  -> IDENTIFIER "=" assignment | logic_or ;
 logic_or    -> logic_and ( "or" logic_and )* ;
 logic_and   -> equality ( "and" equality )* ;
+unary       -> ( "!" | "-" ) unary | call ;
+call        -> primary ( "(" arguments? ")" )* ;
 ```
 
 ## AST walker
