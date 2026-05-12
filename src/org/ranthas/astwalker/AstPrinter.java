@@ -7,6 +7,11 @@ class AstPrinter implements Expr.Visitor<String> {
     }
 
     @Override
+    public String visitCallExpr(Expr.Call expr) {
+        return "Not implemented yet"; // TODO: pendiente de implementar;
+    }
+
+    @Override
     public String visitLogicalExpr(Expr.Logical expr) {
         return "Not implemented yet"; // TODO: pendiente de implementar;
     }
