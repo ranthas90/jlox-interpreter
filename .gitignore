@@ -5,14 +5,7 @@ target/
 .kotlin
 
 ### IntelliJ IDEA ###
-.idea/.gitignore
-.idea/encodings.xml
-.idea/misc.xml
-./idea/vcs.xml
-.idea/modules.xml
-.idea/jarRepositories.xml
-.idea/compiler.xml
-.idea/libraries/
+.idea/
 *.iws
 *.iml
 *.ipr
@@ -34,7 +27,7 @@ target/
 /.nb-gradle/
 build/
 !**/src/main/**/build/
-!**/src/test/**/build/
+#!**/src/test/**/build/
 
 ### VS Code ###
 .vscode/
