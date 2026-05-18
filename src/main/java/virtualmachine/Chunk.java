@@ -1,6 +1,6 @@
 package virtualmachine;
 
-public class Chunk {
+class Chunk {
 
     private byte[] codes;
     private int codesCapacity;
@@ -11,6 +11,8 @@ public class Chunk {
     private int constantsCount;
 
     private int[] lines;
+
+    static final int MAX_CONSTANTS_CAPACITY = 256;
 
     Chunk() {
         codes = new byte[0];
@@ -24,19 +26,19 @@ public class Chunk {
         lines = new int[0];
     }
 
-    public int getCodesCount() {
+    int getCodesCount() {
         return codesCount;
     }
 
-    public byte getCodeAt(int offset) {
+     byte getCodeAt(int offset) {
         return codes[offset];
     }
 
-    public Object getConstantAt(int offset) {
+     Object getConstantAt(int offset) {
         return constants[offset];
     }
 
-    public int getLineAt(int offset) {
+     int getLineAt(int offset) {
         return lines[offset];
     }
 
@@ -57,6 +59,11 @@ public class Chunk {
         lines[codesCount] = line;
 
         codesCount++;
+    }
+
+    void free() {
+        freeCodes();
+        freeConstants();
     }
 
     void freeCodes() {

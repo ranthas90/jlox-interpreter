@@ -1,6 +1,6 @@
-package virtualmachine;
+package virtualmachine.scanner;
 
-class Token {
+public class Token {
 
     private final TokenType type;
     private final Object literal;

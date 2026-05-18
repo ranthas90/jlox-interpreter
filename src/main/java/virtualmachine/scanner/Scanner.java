@@ -1,9 +1,9 @@
-package virtualmachine;
+package virtualmachine.scanner;
 
 import java.util.HashMap;
 import java.util.Map;
 
-import static virtualmachine.TokenType.*;
+import static virtualmachine.scanner.TokenType.*;
 
 public class Scanner {
 
@@ -42,7 +42,7 @@ public class Scanner {
         this.source = source;
     }
 
-    Token scanToken() {
+    public Token scanToken() {
         start = current;
         if (isAtEnd()) {
             return token(EOF);

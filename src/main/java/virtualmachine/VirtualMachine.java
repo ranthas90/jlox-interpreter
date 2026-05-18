@@ -25,22 +25,25 @@ public class VirtualMachine {
     }
 
     InterpretResult interpret(String source) {
-        /*
-        Chunk chunk = new Chunk();
-        compiler.compile(source); // TODO: ¿cómo gestionar errores de compilación?
 
-        this.chunk = chunk;
+        this.chunk = new Chunk();
         this.instructionPointer = 0;
 
+        if (!compiler.compile(source, chunk)) {
+            chunk.free();
+            return InterpretResult.INTERPRET_COMPILE_ERROR;
+        }
+
+
         InterpretResult result = run();
-        chunk.freeCodes();
-        chunk.freeConstants();
+        chunk.free();
 
         return result;
-         */
 
+        /*
         compiler.compile(source);
         return InterpretResult.INTERPRET_OK;
+         */
     }
 
     private void pushValue(Object value) {
