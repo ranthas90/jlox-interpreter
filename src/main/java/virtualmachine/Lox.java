@@ -1,5 +1,7 @@
 package virtualmachine;
 
+import virtualmachine.vm.VirtualMachine;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -19,20 +21,23 @@ public class Lox {
             runFile(args[0]);
         } else {
             repl();
+            //runFile("./src/main/resources/assignment/associativity.lox");
         }
     }
 
     private static void repl() throws IOException {
         InputStreamReader inputStreamReader = new InputStreamReader(System.in);
         BufferedReader bufferedReader = new BufferedReader(inputStreamReader);
+        boolean keepRunning = true;
 
-        for (;;) {
+        while (keepRunning) {
             System.out.print("> ");
             String line = bufferedReader.readLine();
-            if (line == null) {
+            if (line == null || line.isBlank()) {
                 break;
             }
-            virtualMachine.interpret(line);
+            VirtualMachine.InterpretResult result = virtualMachine.interpret(line);
+            keepRunning = result == VirtualMachine.InterpretResult.INTERPRET_OK;
         }
     }
 

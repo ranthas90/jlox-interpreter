@@ -17,7 +17,7 @@ public class Scanner {
 
     static {
         keywords = new HashMap<>();
-        keywords.put("and", AND);
+        keywords.put("and", TOKEN_AND);
         keywords.put("class", CLASS);
         keywords.put("else", ELSE);
         keywords.put("false", FALSE);
@@ -25,7 +25,7 @@ public class Scanner {
         keywords.put("fun", FUN);
         keywords.put("if", IF);
         keywords.put("nil", NIL);
-        keywords.put("or", OR);
+        keywords.put("or", TOKEN_OR);
         keywords.put("print", PRINT);
         keywords.put("return", RETURN);
         keywords.put("super", SUPER);
@@ -43,70 +43,41 @@ public class Scanner {
     }
 
     public Token scanToken() {
+        skipWhitespaces();
         start = current;
+
         if (isAtEnd()) {
             return token(EOF);
         }
 
         char c = advance();
-        switch (c) {
-            case '(':
-                return token(LEFT_PAREN);
-            case ')':
-                return token(RIGHT_PAREN);
-            case '{':
-                return token(LEFT_BRACE);
-            case '}':
-                return token(RIGHT_BRACE);
-            case ';':
-                return token(SEMICOLON);
-            case ',':
-                return token(COMMA);
-            case '.':
-                return token(DOT);
-            case '-':
-                return token(MINUS);
-            case '+':
-                return token(PLUS);
-            case '/':
-                //if (peekNext() == '/') {
-                if (peek() == '/') {
-                    while (peek() != '\n' && !isAtEnd()) {
-                        advance();
-                    }
-                    break;
-                } else {
-                    return token(SLASH);
-                }
-            case '*':
-                return token(STAR);
-            case '!':
-                return token(match('=') ? BANG_EQUAL : BANG);
-            case '=':
-                return token(match('=') ? EQUAL_EQUAL : EQUAL);
-            case '<':
-                return token(match('=') ? LESS_EQUAL : LESS);
-            case '>':
-                return token(match('=') ? GREATER_EQUAL : GREATER);
-            case '"':
-                return string();
-            case ' ', '\r', '\t':
-                //advance();
-                break;
-            case '\n':
-                line++;
-                //advance();
-                break;
-            default:
+        return switch (c) {
+            case '(' -> token(LEFT_PAREN);
+            case ')' -> token(RIGHT_PAREN);
+            case '{' -> token(LEFT_BRACE);
+            case '}' -> token(RIGHT_BRACE);
+            case ';' -> token(SEMICOLON);
+            case ',' -> token(COMMA);
+            case '.' -> token(DOT);
+            case '-' -> token(MINUS);
+            case '+' -> token(PLUS);
+            case '/' -> token(SLASH);
+            case '*' -> token(STAR);
+            case '!' -> token(match('=') ? BANG_EQUAL : BANG);
+            case '=' -> token(match('=') ? EQUAL_EQUAL : EQUAL);
+            case '<' -> token(match('=') ? LESS_EQUAL : LESS);
+            case '>' -> token(match('=') ? GREATER_EQUAL : GREATER);
+            case '"' -> string();
+            default -> {
                 if (isDigit(c)) {
-                    return number();
+                    yield number();
                 } else if (isAlpha(c)) {
-                    return identifier();
+                    yield identifier();
                 } else {
-                    return errorToken("Unexpected character");
+                    yield errorToken("Unexpected character");
                 }
-        }
-        return null;
+            }
+        };
     }
 
     private Token token(TokenType type) {
@@ -189,6 +160,32 @@ public class Scanner {
         // Extraemos el valor contenido entre las comillas dobles
         String value = source.substring(start + 1, current - 1);
         return token(STRING, value);
+    }
+
+    private void skipWhitespaces() {
+        while (true) {
+            char c = peek();
+            switch (c) {
+                case ' ', '\r', '\t':
+                    advance();
+                    break;
+                case '\n':
+                    line++;
+                    advance();
+                    break;
+                case '/':
+                    if (peekNext() == '/') {
+                        while (peek() != '\n' && !isAtEnd()) {
+                            advance();
+                        }
+                    } else {
+                        return;
+                    }
+                    break;
+                default:
+                    return;
+            }
+        }
     }
 
     private char peek() {

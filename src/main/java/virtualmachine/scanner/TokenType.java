@@ -14,8 +14,8 @@ public enum TokenType {
     // Literals.
     IDENTIFIER, STRING, NUMBER,
     // Keywords.
-    AND, CLASS, ELSE, FALSE,
-    FOR, FUN, IF, NIL, OR,
+    TOKEN_AND, CLASS, ELSE, FALSE,
+    FOR, FUN, IF, NIL, TOKEN_OR,
     PRINT, RETURN, SUPER, THIS,
     TRUE, VAR, WHILE,
 
