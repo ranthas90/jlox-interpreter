@@ -8,7 +8,7 @@ public class VirtualMachine {
 
     private byte instructionPointer;
     private Chunk chunk;
-    private Value[] valueStack;
+    private Object[] valueStack;
     private int valueStackTop;
 
     private Debugger debugger = new Debugger();
@@ -24,7 +24,7 @@ public class VirtualMachine {
 
         this.chunk = new Chunk();
         this.instructionPointer = 0;
-        this.valueStack = new Value[256];
+        this.valueStack = new Object[256];
         this.valueStackTop = 0;
 
         if (!compiler.compile(source, chunk)) {
@@ -52,80 +52,71 @@ public class VirtualMachine {
                 case OpCode.CONSTANT -> {
                     int constantIndex = chunk.getCodeAt(instructionPointer++);
                     Object constant = chunk.getConstantAt(constantIndex);
-                    pushValue(new DoubleValue(constant));
+                    pushValue(constant);
                     System.out.printf("%s", constant);
                     System.out.println();
                 }
-                case OpCode.NIL -> pushValue(new NilValue());
-                case OpCode.TRUE -> pushValue(new BooleanValue(true));
-                case OpCode.FALSE -> pushValue(new BooleanValue(false));
+                case OpCode.NIL -> pushValue(null);
+                case OpCode.TRUE -> pushValue(true);
+                case OpCode.FALSE -> pushValue(false);
                 case OpCode.EQUAL -> {
-                    Value a = popValue();
-                    Value b = popValue();
-                    pushValue(new BooleanValue(a.equals(b)));
+                    Object a = popValue();
+                    Object b = popValue();
+                    if (a == null) {
+                        pushValue(b == null);
+                    } else {
+                        pushValue(a.equals(b));
+                    }
                 }
                 case OpCode.GREATER -> {
-                    if (!peekValue(0).isNumber() || !peekValue(1).isNumber()) {
+                    if (!(peekValue(0) instanceof Double) || !(peekValue(1) instanceof Double)) {
                         runtimeError(instruction, "Operands must be numbers");
                         return InterpretResult.INTERPRET_RUNTIME_ERROR;
                     }
-                    double a = new DoubleValue(popValue().getValue()).getValue();
-                    double b = new DoubleValue(popValue().getValue()).getValue();
-                    pushValue(new BooleanValue(a > b));
+                    pushValue(((Double) popValue()) > ((Double) popValue()));
                 }
                 case OpCode.LESS -> {
-                    if (!peekValue(0).isNumber() || !peekValue(1).isNumber()) {
+                    if (!(peekValue(0) instanceof Double) || !(peekValue(1) instanceof Double)) {
                         runtimeError(instruction, "Operands must be numbers");
                         return InterpretResult.INTERPRET_RUNTIME_ERROR;
                     }
-                    double a = new DoubleValue(popValue().getValue()).getValue();
-                    double b = new DoubleValue(popValue().getValue()).getValue();
-                    pushValue(new BooleanValue(a < b));
+                    pushValue(((Double) popValue()) < ((Double) popValue()));
                 }
                 case OpCode.ADD -> {
-                    if (!peekValue(0).isNumber() || !peekValue(1).isNumber()) {
+                    if (!(peekValue(0) instanceof Double) || !(peekValue(1) instanceof Double)) {
                         runtimeError(instruction, "Operands must be numbers");
                         return InterpretResult.INTERPRET_RUNTIME_ERROR;
                     }
-                    double a = new DoubleValue(popValue().getValue()).getValue();
-                    double b = new DoubleValue(popValue().getValue()).getValue();
-                    pushValue(new DoubleValue(a + b));
+                    pushValue(((Double) popValue()) + ((Double) popValue()));
                 }
                 case OpCode.SUBTRACT -> {
-                    if (!peekValue(0).isNumber() || !peekValue(1).isNumber()) {
+                    if (!(peekValue(0) instanceof Double) || !(peekValue(1) instanceof Double)) {
                         runtimeError(instruction, "Operands must be numbers");
                         return InterpretResult.INTERPRET_RUNTIME_ERROR;
                     }
-                    double a = new DoubleValue(popValue().getValue()).getValue();
-                    double b = new DoubleValue(popValue().getValue()).getValue();
-                    pushValue(new DoubleValue(a - b));
+                    pushValue(((Double) popValue()) - ((Double) popValue()));
                 }
                 case OpCode.MULTIPLY -> {
-                    if (!peekValue(0).isNumber() || !peekValue(1).isNumber()) {
+                    if (!(peekValue(0) instanceof Double) || !(peekValue(1) instanceof Double)) {
                         runtimeError(instruction, "Operands must be numbers");
                         return InterpretResult.INTERPRET_RUNTIME_ERROR;
                     }
-                    double a = new DoubleValue(popValue().getValue()).getValue();
-                    double b = new DoubleValue(popValue().getValue()).getValue();
-                    pushValue(new DoubleValue(a * b));
+                    pushValue(((Double) popValue()) * ((Double) popValue()));
                 }
                 case OpCode.DIVIDE -> {
-                    if (!peekValue(0).isNumber() || !peekValue(1).isNumber()) {
+                    if (!(peekValue(0) instanceof Double) || !(peekValue(1) instanceof Double)) {
                         runtimeError(instruction, "Operands must be numbers");
                         return InterpretResult.INTERPRET_RUNTIME_ERROR;
                     }
-                    double a = new DoubleValue(popValue().getValue()).getValue();
-                    double b = new DoubleValue(popValue().getValue()).getValue();
-                    pushValue(new DoubleValue(a / b));
+                    pushValue(((Double) popValue()) / ((Double) popValue()));
                 }
-                case OpCode.NOT -> pushValue(new BooleanValue(isFalsey(popValue())));
+                case OpCode.NOT -> pushValue(isFalsey(popValue()));
                 case OpCode.NEGATE -> {
-                    if (!peekValue(0).isNumber()) {
+                    if (!(peekValue(0) instanceof Double)) {
                         runtimeError(instruction, "Operand must be a number");
                         return InterpretResult.INTERPRET_RUNTIME_ERROR;
                     }
-                    double val = new DoubleValue(popValue().getValue()).getValue() * -1.0D;
-                    pushValue(new DoubleValue(val));
+                    pushValue(((Double)popValue()) * -1.0D);
                 }
                 case OpCode.RETURN -> {
                     System.out.printf("%s", popValue());
@@ -136,7 +127,7 @@ public class VirtualMachine {
         }
     }
 
-    private void pushValue(Value value) {
+    private void pushValue(Object value) {
         if (valueStackTop > 255) {
             // TODO: gestionar este tipo de error
             throw new RuntimeException("Exceeded value stack capacity");
@@ -145,7 +136,7 @@ public class VirtualMachine {
         valueStackTop++;
     }
 
-    private Value popValue() {
+    private Object popValue() {
         if (valueStackTop == 0) {
             // TODO: gestionar este tipo de error
             throw new RuntimeException("Value stack is already empty");
@@ -154,12 +145,12 @@ public class VirtualMachine {
         return valueStack[valueStackTop];
     }
 
-    private Value peekValue(int distance) {
+    private Object peekValue(int distance) {
         return valueStack[-1 - distance];
     }
 
     private void resetValueStack() {
-        valueStack = new Value[256];
+        valueStack = new Object[256];
         valueStackTop = 0;
     }
 
@@ -170,8 +161,7 @@ public class VirtualMachine {
         resetValueStack();
     }
 
-    private boolean isFalsey(Value value) {
-        return value.isNil() ||
-                (value.isBool() && !((BooleanValue) value).getValue());
+    private boolean isFalsey(Object value) {
+        return value == null || (value instanceof Boolean && !((Boolean) value));
     }
 }
