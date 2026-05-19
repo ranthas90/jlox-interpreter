@@ -83,11 +83,14 @@ public class VirtualMachine {
                     pushValue(((Double) popValue()) < ((Double) popValue()));
                 }
                 case OpCode.ADD -> {
-                    if (!(peekValue(0) instanceof Double) || !(peekValue(1) instanceof Double)) {
+                    if (peekValue(0) instanceof String && peekValue(1) instanceof String) {
+                        pushValue(((String) popValue()) + ((String) popValue()));
+                    } else if (peekValue(0) instanceof Double && peekValue(1) instanceof Double) {
+                        pushValue(((Double) popValue()) + ((Double) popValue()));
+                    } else {
                         runtimeError(instruction, "Operands must be numbers");
                         return InterpretResult.INTERPRET_RUNTIME_ERROR;
                     }
-                    pushValue(((Double) popValue()) + ((Double) popValue()));
                 }
                 case OpCode.SUBTRACT -> {
                     if (!(peekValue(0) instanceof Double) || !(peekValue(1) instanceof Double)) {

@@ -51,7 +51,7 @@ public class Compiler {
         addRule(LESS,           null,                   new BinaryParseFn(),    COMPARISON);
         addRule(LESS_EQUAL,     null,                   new BinaryParseFn(),    COMPARISON);
         addRule(IDENTIFIER,     null,                   null,                   NONE);
-        addRule(STRING,         null,                   null,                   NONE);
+        addRule(STRING,         new StringParseFn(),    null,                   NONE);
         addRule(NUMBER,         new NumberParseFn(),    null,                   NONE);
         addRule(TOKEN_AND,      null,                   null,                   NONE);
         addRule(CLASS,          null,                   null,                   NONE);
