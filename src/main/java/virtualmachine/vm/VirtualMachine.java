@@ -41,7 +41,7 @@ public class VirtualMachine {
 
     private InterpretResult run() {
         while (true) {
-            System.out.printf("          ");
+            System.out.print("          ");
             for (Object slot : valueStack) {
                 System.out.printf("[ %s ]", slot);
             }
