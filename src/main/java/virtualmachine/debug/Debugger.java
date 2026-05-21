@@ -23,9 +23,14 @@ public class Debugger {
         byte instruction = chunk.getCodeAt(offset);
         return switch (instruction) {
             case OpCode.CONSTANT -> constantInstruction("OP_CONSTANT", chunk, offset);
-            case OpCode.NIL -> simpleInstruction("OP_NIL", offset);
-            case OpCode.TRUE -> simpleInstruction("OP_TRUE", offset);
+            case OpCode.NIL -> simpleInstruction("OP_NIL", offset); case OpCode.TRUE -> simpleInstruction("OP_TRUE", offset);
             case OpCode.FALSE -> simpleInstruction("OP_FALSE", offset);
+            case OpCode.POP -> simpleInstruction("OP_POP", offset);
+            case OpCode.GET_LOCAL -> byteInstruction("OP_GET_LOCAL", chunk, offset);
+            case OpCode.SET_LOCAL -> byteInstruction("OP_SET_LOCAL", chunk, offset);
+            case OpCode.GET_GLOBAL -> constantInstruction("OP_GET_GLOBAL", chunk, offset);
+            case OpCode.DEFINE_GLOBAL -> constantInstruction("OP_DEFINE_GLOBAL", chunk, offset);
+            case OpCode.SET_GLOBAL -> constantInstruction("OP_SET_GLOBAL", chunk, offset);
             case OpCode.EQUAL -> simpleInstruction("OP_EQUAL", offset);
             case OpCode.GREATER -> simpleInstruction("OP_GREATER", offset);
             case OpCode.LESS -> simpleInstruction("OP_LESS", offset);
@@ -35,6 +40,7 @@ public class Debugger {
             case OpCode.DIVIDE -> simpleInstruction("OP_DIVIDE", offset);
             case OpCode.NOT -> simpleInstruction("OP_NOT", offset);
             case OpCode.NEGATE -> simpleInstruction("OP_NEGATE", offset);
+            case OpCode.PRINT -> simpleInstruction("OP_PRINT", offset);
             case OpCode.RETURN -> simpleInstruction("OP_RETURN", offset);
             default -> {
                 System.out.printf("Unknown opcode %d\n", instruction);
@@ -54,5 +60,11 @@ public class Debugger {
     private int simpleInstruction(String name, int offset) {
         System.out.printf("%s\n", name);
         return offset + 1;
+    }
+
+    private int byteInstruction(String name, Chunk chunk, int offset) {
+        byte slot = chunk.getCodeAt(offset + 1);
+        System.out.printf("%-16s %4d\n", name, slot);
+        return offset + 2;
     }
 }

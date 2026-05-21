@@ -5,7 +5,7 @@ import virtualmachine.scanner.TokenType;
 
 public class GroupingParseFn implements ParseFn {
     @Override
-    public void parse(Compiler compiler) {
+    public void parse(Compiler compiler, boolean canAssign) {
         compiler.expression();
         compiler.consume(TokenType.RIGHT_PAREN, "Expect ')' after expression");
     }

@@ -4,5 +4,5 @@ import virtualmachine.compiler.Compiler;
 
 public interface ParseFn {
 
-    void parse(Compiler compiler);
+    void parse(Compiler compiler, boolean canAssign);
 }

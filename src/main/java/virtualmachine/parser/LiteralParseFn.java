@@ -5,7 +5,7 @@ import virtualmachine.compiler.OpCode;
 
 public class LiteralParseFn implements ParseFn {
     @Override
-    public void parse(Compiler compiler) {
+    public void parse(Compiler compiler, boolean canAssign) {
         switch (compiler.getParser().getPrevious().getType()) {
             case FALSE: compiler.emitByte(OpCode.FALSE); break;
             case NIL: compiler.emitByte(OpCode.NIL); break;

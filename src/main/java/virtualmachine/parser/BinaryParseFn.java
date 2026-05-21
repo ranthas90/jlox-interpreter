@@ -6,7 +6,7 @@ import virtualmachine.scanner.TokenType;
 
 public class BinaryParseFn implements ParseFn {
     @Override
-    public void parse(Compiler compiler) {
+    public void parse(Compiler compiler, boolean canAssign) {
         TokenType operatorType = compiler.getParser().getPrevious().getType();
         ParseRule rule = compiler.getRule(operatorType);
         compiler.parsePrecedence(rule.getPrecedence() + 1);

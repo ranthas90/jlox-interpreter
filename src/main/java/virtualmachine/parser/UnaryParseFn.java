@@ -8,7 +8,7 @@ import virtualmachine.scanner.TokenType;
 public class UnaryParseFn implements ParseFn {
 
     @Override
-    public void parse(Compiler compiler) {
+    public void parse(Compiler compiler, boolean canAssign) {
         TokenType operatorType = compiler.getParser().getPrevious().getType();
         compiler.parsePrecedence(Precedence.UNARY);
 

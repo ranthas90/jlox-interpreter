@@ -16,6 +16,7 @@ public class Compiler {
 
     private Scanner scanner;
     private Parser parser;
+    private Locals currentLocals;
     private Debugger debugger;
     private Chunk compilingChunk;
     private Map<TokenType, ParseRule> rules;
@@ -25,6 +26,7 @@ public class Compiler {
 
     public Compiler() {
         parser = new Parser();
+        currentLocals = new Locals();
         debugger = new Debugger();
         initRules();
     }
@@ -50,7 +52,7 @@ public class Compiler {
         addRule(GREATER_EQUAL,  null,                   new BinaryParseFn(),    COMPARISON);
         addRule(LESS,           null,                   new BinaryParseFn(),    COMPARISON);
         addRule(LESS_EQUAL,     null,                   new BinaryParseFn(),    COMPARISON);
-        addRule(IDENTIFIER,     null,                   null,                   NONE);
+        addRule(IDENTIFIER,     new VariableParserFn(), null,                   NONE);
         addRule(STRING,         new StringParseFn(),    null,                   NONE);
         addRule(NUMBER,         new NumberParseFn(),    null,                   NONE);
         addRule(TOKEN_AND,      null,                   null,                   NONE);
@@ -85,8 +87,11 @@ public class Compiler {
         compilingChunk = chunk;
 
         advance();
-        expression();
-        consume(TokenType.EOF, "Expect end of expression");
+
+        while(!match(TokenType.EOF)) {
+            declaration();
+        }
+
         endCompiler();
 
         return !parser.isHadError();
@@ -102,7 +107,96 @@ public class Compiler {
 
     public void expression() {
         parsePrecedence(ASSIGNMENT);
-        debugger.disassembleChunk(compilingChunk, "chunk test1");
+    }
+
+    public void declaration() {
+        if (match(VAR)) {
+            varDeclaration();
+        } else {
+            statement();
+        }
+
+        if (parser.isPanicMode()) {
+            synchronize();
+        }
+    }
+
+    public void varDeclaration() {
+        byte global = parseVariable("Expect variable name");
+
+        if (match(EQUAL)) {
+            expression();
+        } else {
+            emitByte(OpCode.NIL);
+        }
+
+        consume(SEMICOLON, "Expect ';' after variable declaration");
+        defineVariable(global);
+    }
+
+    public void statement() {
+        if (match(PRINT)) {
+            printStatement();
+        } else if (match(IF)) {
+            ifStatement();
+        } else if (match(LEFT_BRACE)) {
+            beginScope();
+            block();
+            endScope();
+        } else {
+            expressionStatement();
+        }
+    }
+
+    public void block() {
+        while(!check(RIGHT_BRACE) && !check(EOF)) {
+            declaration();
+        }
+        consume(RIGHT_BRACE, "Expect '}' after block");
+    }
+
+    public void expressionStatement() {
+        expression();
+        consume(SEMICOLON, "Expect ';' after expression");
+        emitByte(OpCode.POP);
+    }
+
+    public void ifStatement() {
+        consume(LEFT_PAREN, "Expect '(' after 'if'");
+        expression();
+        consume(RIGHT_PAREN, "Expect ')' after condition");
+
+        int thenJump = emitJump(OpCode.JUMP_IF_FALSE);
+        statement();
+
+        patchJump(thenJump);
+    }
+
+    public void printStatement() {
+        expression();
+        consume(SEMICOLON, "Expect ';' after value");
+        emitByte(OpCode.PRINT);
+    }
+
+    public void namedVariable(Token name, boolean canAssign) {
+        byte getOperation, setOperation;
+        int arg = resolveLocal(name);
+
+        if (arg != -1) {
+            getOperation = OpCode.GET_LOCAL;
+            setOperation = OpCode.SET_LOCAL;
+        } else {
+            arg = identifierConstant(name);
+            getOperation = OpCode.SET_GLOBAL;
+            setOperation = OpCode.SET_GLOBAL;
+        }
+
+        if (canAssign && match(EQUAL)) {
+            expression();
+            emitBytes(setOperation, (byte) arg);
+        } else {
+            emitBytes(getOperation, (byte) arg);
+        }
     }
 
     public void consume(TokenType type, String message) {
@@ -118,14 +212,44 @@ public class Compiler {
         ParseFn prefixRule = getRule(parser.getPrevious().getType()).getPrefix();
         if (prefixRule == null) {
             errorAt(parser.getPrevious(), "Expect expression");
-        } else {
-            prefixRule.parse(this);
-            while (precedence <= getRule(parser.getCurrent().getType()).getPrecedence()) {
-                advance();
-                ParseFn infixRule = getRule(parser.getPrevious().getType()).getInfix();
-                infixRule.parse(this);
-            }
+            return;
         }
+
+        boolean canAssign = precedence <= ASSIGNMENT;
+        prefixRule.parse(this, canAssign);
+        while (precedence <= getRule(parser.getCurrent().getType()).getPrecedence()) {
+            advance();
+            ParseFn infixRule = getRule(parser.getPrevious().getType()).getInfix();
+            infixRule.parse(this, canAssign);
+        }
+
+        if (canAssign && match(EQUAL)) {
+            errorAt(parser.getCurrent(), "Invalid assignment target");
+        }
+    }
+
+    public byte parseVariable(String errorMessage) {
+        consume(IDENTIFIER, errorMessage);
+        declareVariable();
+
+        if (currentLocals.getScopeDepth() > 0) {
+            return 0x0;
+        }
+
+        return identifierConstant(parser.getPrevious());
+    }
+
+    public void markInitialized() {
+        currentLocals.markInitialized();
+    }
+
+    public void defineVariable(byte global) {
+        if (currentLocals.getScopeDepth() > 0) {
+            markInitialized();
+            return;
+        }
+
+        emitBytes(OpCode.DEFINE_GLOBAL, global);
     }
 
     public void emitByte(byte aByte) {
@@ -137,26 +261,141 @@ public class Compiler {
         emitByte(b2);
     }
 
-    public void emitConstant(Object value) {
+    public int emitJump(byte instruction) {
+        emitByte(instruction);
+        emitByte((byte) 0xFF);
+        emitByte((byte) 0xFF);
+
+        return compilingChunk.getCodesCount() - 2;
+    }
+
+    public void patchJump(int offset) {
+        // emitJump returns current byte with -2 offset!
+        int jump = compilingChunk.getCodesCount() - offset - 2;
+        if (jump > 65535) {
+            errorAt(parser.getCurrent(), "Too much code to jump over");
+        }
+
+        compilingChunk.setCodeAt(offset, ((byte) ((jump >> 8) & 0xFF)));
+        compilingChunk.setCodeAt(offset + 1, ((byte) (jump & 0xFF)));
+    }
+
+    public byte makeConstant(Object value) {
         int constantIndex = compilingChunk.writeConstant(value);
         if (constantIndex > Chunk.MAX_CONSTANTS_CAPACITY) {
             errorAt(parser.getPrevious(), "Too many constants in one chunk");
             constantIndex = 0;
         }
-        emitBytes(OpCode.CONSTANT, (byte) constantIndex);
+        return (byte)constantIndex;
+    }
+
+    public void emitConstant(Object value) {
+        emitBytes(OpCode.CONSTANT, makeConstant(value));
     }
 
     // *********************************************************************
     // Private methods
 
+    private void beginScope() {
+        currentLocals.incrementScopeDepth();
+    }
+
+    private void endScope() {
+        currentLocals.decrementScopeDepth();
+        while (currentLocals.getLocalCount() > 0 &&
+                currentLocals.getAt(currentLocals.getLocalCount() - 1).getDepth() > currentLocals.getScopeDepth()) {
+            emitByte(OpCode.POP);
+            currentLocals.decrementLocalCount();
+        }
+    }
+
     private void advance() {
         parser.setPrevious(parser.getCurrent());
         while (true) {
-            parser.setCurrent(scanner.scanToken());
+            Token token = scanner.scanToken();
+            parser.setCurrent(token);
             if (parser.getCurrent().getType() != TokenType.ERROR) {
                 break;
             }
             errorAt(parser.getCurrent(), (String) parser.getCurrent().getLiteral());
+        }
+    }
+
+    private boolean match(TokenType type) {
+        if (!check(type)) {
+            return false;
+        }
+        advance();
+        return true;
+    }
+
+    private boolean check(TokenType type) {
+        return parser.getCurrent().getType() == type;
+    }
+
+    private byte identifierConstant(Token name) {
+        return makeConstant(name.getLiteral());
+    }
+
+    private boolean identifiersEqual(Token a, Token b) {
+        return a.getLiteral().equals(b.getLiteral()); // TODO: mejorar esto!!!!
+    }
+
+    private int resolveLocal(Token name) {
+        for (int i = currentLocals.getLocalCount() - 1; i >= 0; i--) {
+            Local local = currentLocals.getAt(i);
+            if (identifiersEqual(name, local.getName())) {
+                if (local.getDepth() == -1) {
+                    errorAt(parser.getCurrent(), "Can't read local variable in its own initializer");
+                }
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private void declareVariable() {
+        if (currentLocals.getScopeDepth() > 0) {
+            return;
+        }
+
+        Token name = parser.getPrevious();
+        for (int i = currentLocals.getLocalCount() - 1; i >= 0; i--) {
+            Local local = currentLocals.getLocals()[i];
+            if (local.getDepth() != -1 && local.getDepth() < currentLocals.getScopeDepth()) {
+                break;
+            }
+
+            if (identifiersEqual(name, local.getName())) {
+                errorAt(parser.getCurrent(), "Already a variable with this name in this scope");
+            }
+        }
+
+        addLocal(name);
+    }
+
+    private void addLocal(Token name) {
+        if (currentLocals.getLocalCount() == (Integer.MAX_VALUE -1)) {
+            errorAt(parser.getCurrent(), "Too many local variables in function");
+            return;
+        }
+
+        Local local = currentLocals.getLocals()[currentLocals.getLocalCount() + 1];
+        local.setName(name);
+        local.setDepth(-1);
+    }
+
+    // Skip tokens until we reach a statement boundary (semicolon).
+    private void synchronize() {
+        parser.setPanicMode(false);
+        while (parser.getCurrent().getType() != EOF) {
+            if (parser.getPrevious().getType() == SEMICOLON) {
+                switch (parser.getCurrent().getType()) {
+                    case CLASS,FUN,VAR,FOR,IF,WHILE,PRINT,RETURN: return;
+                    default:;
+                }
+                advance();
+            }
         }
     }
 

@@ -2,10 +2,9 @@ package virtualmachine.parser;
 
 import virtualmachine.compiler.Compiler;
 
-public class NumberParseFn implements ParseFn {
+public class VariableParserFn implements ParseFn {
     @Override
     public void parse(Compiler compiler, boolean canAssign) {
-        Object value = compiler.getParser().getPrevious().getLiteral();
-        compiler.emitConstant(value);
+        compiler.namedVariable(compiler.getParser().getPrevious(), canAssign);
     }
 }

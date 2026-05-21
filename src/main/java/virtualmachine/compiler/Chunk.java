@@ -34,6 +34,10 @@ public class Chunk {
         return codes[offset];
     }
 
+    public void setCodeAt(int offset, byte code) {
+        codes[offset] = code;
+    }
+
     public Object getConstantAt(int offset) {
         return constants[offset];
     }
