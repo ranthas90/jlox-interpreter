@@ -14,7 +14,6 @@ import static virtualmachine.scanner.TokenType.*;
 
 public class Compiler {
 
-    private Compiler enclosing;
     private Scanner scanner;
     private Parser parser;
     private Locals currentLocals;
@@ -27,18 +26,21 @@ public class Compiler {
     // Init
 
     public Compiler(FunctionType type) {
-        enclosing = this;
         parser = new Parser();
         currentLocals = new Locals();
         function = new Function();
         this.type = type;
         debugger = new Debugger();
         initRules();
+
+        if (type != FunctionType.SCRIPT) {
+            function.setName((String) parser.getPrevious().getLiteral());
+        }
     }
 
     private void initRules() {
         rules = new HashMap<>();
-        addRule(LEFT_PAREN,     new GroupingParseFn(),  null,                   NONE);
+        addRule(LEFT_PAREN,     new GroupingParseFn(),  new CallParseFn(),      NONE);
         addRule(RIGHT_PAREN,    null,                   null,                   NONE);
         addRule(LEFT_BRACE,     null,                   null,                   NONE);
         addRule(RIGHT_BRACE,    null,                   null,                   NONE);
@@ -168,6 +170,17 @@ public class Compiler {
         beginScope();
 
         consume(LEFT_PAREN, "Expect '(' after function name");
+        if (!check(RIGHT_PAREN)) {
+            do {
+                function.incrementArity();
+                if (function.getArity() > 255) {
+                    errorAt(parser.getCurrent(), "Can't have more than 255 parameters"); // Este errorAt esta bien, cambiar el resto por previous
+                }
+                byte constant = parseVariable("Expect parameter name");
+                defineVariable(constant);
+            } while (match(COMMA));
+        }
+
         consume(RIGHT_PAREN, "Expect ')' after parameters");
         consume(LEFT_BRACE, "Expect '{' before function body");
         block();
@@ -354,6 +367,21 @@ public class Compiler {
         emitBytes(OpCode.DEFINE_GLOBAL, global);
     }
 
+    public int argumentList() {
+        int argCount = 0;
+        if (!check(RIGHT_PAREN)) {
+            do {
+                expression();
+                if (argCount == 255) {
+                    errorAt(parser.getPrevious(), "Can't have more than 255 arguments");
+                }
+                argCount++;
+            } while (match(COMMA));
+        }
+        consume(RIGHT_PAREN, "Expect ')' after arguments");
+        return argCount;
+    }
+
     public void emitByte(byte aByte) {
         currentChunk().writeCode(aByte, parser.getPrevious().getLine());
     }
@@ -522,7 +550,6 @@ public class Compiler {
         if (!parser.isHadError()) {
             debugger.disassembleChunk(currentChunk(), function.getName() != null ? function.getName() : "<script>");
         }
-        this = enclosing;
         return function;
     }
 

@@ -6,6 +6,7 @@ import virtualmachine.compiler.FunctionType;
 import virtualmachine.compiler.OpCode;
 import virtualmachine.debug.Debugger;
 
+import java.io.LineNumberInputStream;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -42,12 +43,7 @@ public class VirtualMachine {
         }
 
         pushValue(function);
-        CallFrame frame = new CallFrame();
-        frame.setFunction(function);
-        frame.setInstructionPointer(0);
-        frame.setSlots(valueStack);
-
-        frames[frameCount++] = frame;
+        call(function, 0);
 
         return run();
     }
@@ -189,6 +185,13 @@ public class VirtualMachine {
                     short offset = readShort(frame);
                     frame.setInstructionPointer(frame.getInstructionPointer() - offset);
                 }
+                case OpCode.CALL -> {
+                    int argCount = readByte(frame);
+                    if (!callValue(peekValue(argCount), argCount)) {
+                        return InterpretResult.INTERPRET_RUNTIME_ERROR;
+                    }
+                    frame = frames[frameCount - 1];
+                }
                 case OpCode.RETURN -> {
                     return InterpretResult.INTERPRET_OK;
                 }
@@ -206,6 +209,11 @@ public class VirtualMachine {
         valueStackCount++;
     }
 
+    private void pushFrame(CallFrame frame) {
+        frames[frameCount] = frame;
+        frameCount++;
+    }
+
     private Object popValue() {
         if (valueStackTop == 0) {
             // TODO: gestionar este tipo de error
@@ -220,6 +228,28 @@ public class VirtualMachine {
     private Object peekValue(int distance) {
         //return valueStack[-1 - distance];
         return valueStack[valueStackTop - 1 - distance];
+    }
+
+    private boolean call(Function function, int argCount) {
+        CallFrame frame = new CallFrame();
+        frame.setFunction(function);
+        frame.setInstructionPointer(frame.getInstructionPointer());
+
+        int length = valueStackTop - (valueStackTop - argCount - 1);
+        Object[] slots = new Object[length];
+        System.arraycopy(valueStack, valueStackTop - argCount -1, slots, 0,length);
+        frame.setSlots(slots);
+
+        pushFrame(frame);
+        return true;
+    }
+
+    private boolean callValue(Object callee, int argCount) {
+        if (callee instanceof Function) {
+            return call((Function) callee, argCount);
+        }
+        runtimeError((byte) 0, "Can only call functions and classes"); // TODO: cambiar runtimeError para que obtenga la instruccion actual directamente del bytecode
+        return false;
     }
 
     private void resetValueStack() {

@@ -13,12 +13,24 @@ public class Function {
         chunk = new Chunk();
     }
 
+    public int getArity() {
+        return arity;
+    }
+
     public Chunk getChunk() {
         return chunk;
     }
 
     public String getName() {
         return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public void incrementArity() {
+        arity++;
     }
 
     @Override

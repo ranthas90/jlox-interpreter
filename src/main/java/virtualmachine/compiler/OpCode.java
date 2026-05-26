@@ -24,5 +24,6 @@ public class OpCode {
     public static final byte JUMP =             0x14;
     public static final byte JUMP_IF_FALSE =    0x15;
     public static final byte LOOP =             0x16;
-    public static final byte RETURN =           0x17;
+    public static final byte CALL =             0x17;
+    public static final byte RETURN =           0x18;
 }

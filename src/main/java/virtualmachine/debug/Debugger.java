@@ -44,6 +44,7 @@ public class Debugger {
             case OpCode.JUMP -> jumpInstruction("OP_JUMP",1,chunk, offset);
             case OpCode.JUMP_IF_FALSE -> jumpInstruction("OP_JUMP_IF_FALSE", 1, chunk, offset);
             case OpCode.LOOP -> jumpInstruction("OP_LOOP", -1, chunk, offset);
+            case OpCode.CALL -> byteInstruction("OP_CALL", chunk, offset);
             case OpCode.RETURN -> simpleInstruction("OP_RETURN", offset);
             default -> {
                 System.out.printf("Unknown opcode %d\n", instruction);
