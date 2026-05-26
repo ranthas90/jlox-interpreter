@@ -6,6 +6,7 @@ import virtualmachine.compiler.FunctionType;
 import virtualmachine.compiler.OpCode;
 import virtualmachine.debug.Debugger;
 
+import javax.print.attribute.standard.RequestingUserName;
 import java.io.LineNumberInputStream;
 import java.util.HashMap;
 import java.util.Map;
@@ -226,11 +227,20 @@ public class VirtualMachine {
     }
 
     private Object peekValue(int distance) {
-        //return valueStack[-1 - distance];
         return valueStack[valueStackTop - 1 - distance];
     }
 
     private boolean call(Function function, int argCount) {
+        if (argCount != function.getArity()) {
+            runtimeError((byte) 0, "Expected %d arguments but got %d"); // TODO: runtime error necesita extraer el instruction del bytecode en lugar de cogerlo por parámetro
+            return false;
+        }
+
+        if (frameCount == 64) { // TODO: Usaar constante FRAMES_MAX
+            runtimeError((byte) 0, "Stack overflow");
+            return false;
+        }
+
         CallFrame frame = new CallFrame();
         frame.setFunction(function);
         frame.setInstructionPointer(frame.getInstructionPointer());
@@ -260,10 +270,36 @@ public class VirtualMachine {
 
     private void runtimeError(byte instruction, String message) {
         System.err.println(message);
+        /* Previo
         CallFrame frame = frames[frameCount - 1];
         int line = frame.getFunction().getChunk().getLineAt(instruction);
         System.err.printf("[line %d] in script\n", line);
         resetValueStack();
+         */
+        for (int i = frameCount - 1; i >= 0; i--) {
+            CallFrame frame = frames[i];
+            Function function = frame.getFunction();
+            byte instr = function.getChunk().getCodeAt(frame.getInstructionPointer()); // TODO: revisar con programa erroneo del libro!!!
+            System.err.printf("[line %d] in ", frame.getFunction().getChunk().getLineAt(instr));
+            if (function.getName() == null) {
+                System.err.println("script");
+            } else {
+                System.err.printf("%s()\n", function.getName());
+            }
+        }
+        /* Nuevo (implementación en C)
+          for (int i = vm.frameCount - 1; i >= 0; i--) {
+            CallFrame* frame = &vm.frames[i];
+            ObjFunction* function = frame->function;
+            size_t instruction = frame->ip - function->chunk.code - 1;
+            fprintf(stderr, "[line %d] in ", function->chunk.lines[instruction]);
+            if (function->name == NULL) {
+                fprintf(stderr, "script\n");
+            } else {
+                fprintf(stderr, "%s()\n", function->name->chars);
+            }
+          }
+         */
     }
 
     private boolean isFalsey(Object value) {
