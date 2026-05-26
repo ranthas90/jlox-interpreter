@@ -7,7 +7,7 @@ public class Locals {
     private int scopeDepth;
 
     public Locals() {
-        locals = new Local[Integer.MAX_VALUE - 1];
+        locals = new Local[256]; // TODO: chequear cuanto hay que poner aqui, Integer.MAX_VALUE - 1 es demasiado
         localCount = 0;
         scopeDepth = 0;
     }

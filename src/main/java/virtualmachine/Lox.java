@@ -20,8 +20,8 @@ public class Lox {
         } else if (args.length == 1) {
             runFile(args[0]);
         } else {
-            repl();
-            //runFile("./src/main/resources/assignment/associativity.lox");
+            //repl();
+            runFile("./src/main/resources/if/else.lox");
         }
     }
 

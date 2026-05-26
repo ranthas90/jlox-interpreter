@@ -55,7 +55,7 @@ public class Compiler {
         addRule(IDENTIFIER,     new VariableParserFn(), null,                   NONE);
         addRule(STRING,         new StringParseFn(),    null,                   NONE);
         addRule(NUMBER,         new NumberParseFn(),    null,                   NONE);
-        addRule(TOKEN_AND,      null,                   null,                   NONE);
+        addRule(TOKEN_AND,      null,                   new AndParseFn(),       AND);
         addRule(CLASS,          null,                   null,                   NONE);
         addRule(ELSE,           null,                   null,                   NONE);
         addRule(FALSE,          new LiteralParseFn(),   null,                   NONE);
@@ -137,8 +137,12 @@ public class Compiler {
     public void statement() {
         if (match(PRINT)) {
             printStatement();
+        } else if (match(FOR)) {
+            forStatement();
         } else if (match(IF)) {
             ifStatement();
+        }else if (match(WHILE)) {
+            whileStatement();
         } else if (match(LEFT_BRACE)) {
             beginScope();
             block();
@@ -161,21 +165,92 @@ public class Compiler {
         emitByte(OpCode.POP);
     }
 
+    public void forStatement() {
+        beginScope();
+        consume(LEFT_PAREN, "Expect '(' after 'for'");
+        if (match(SEMICOLON)) {
+            // No initializer
+        } else if (match(VAR)) {
+            varDeclaration();
+        } else {
+            expressionStatement();
+        }
+
+        int loopStart = compilingChunk.getCodesCount();
+        int exitJump = -1;
+        if (!match(SEMICOLON)) {
+            expression();
+            consume(SEMICOLON, "Expect ';' after loop condition");
+
+            // Jump out of the loop if the condition is false
+            exitJump = emitJump(OpCode.JUMP_IF_FALSE);
+            emitByte(OpCode.POP);
+        }
+
+        consume(SEMICOLON, "Expect ';'");
+
+        if (!match(RIGHT_PAREN)) {
+            int bodyJump = emitJump(OpCode.JUMP);
+            int incrementStart = compilingChunk.getCodesCount();
+            expression();
+            emitByte(OpCode.POP);
+            consume(RIGHT_PAREN, "Expect ')' after for clauses");
+
+            emitLoop(loopStart);
+            loopStart = incrementStart;
+            patchJump(bodyJump);
+        }
+
+        statement();
+        emitLoop(loopStart);
+
+        if (exitJump != -1) {
+            patchJump(exitJump);
+            emitByte(OpCode.POP);
+        }
+
+        endScope();
+    }
+
     public void ifStatement() {
         consume(LEFT_PAREN, "Expect '(' after 'if'");
         expression();
         consume(RIGHT_PAREN, "Expect ')' after condition");
 
         int thenJump = emitJump(OpCode.JUMP_IF_FALSE);
+        emitByte(OpCode.POP);
         statement();
 
+        int elseJump = emitJump(OpCode.JUMP);
         patchJump(thenJump);
+        emitByte(OpCode.POP);
+
+        if (match(ELSE)) {
+            statement();
+        }
+
+        patchJump(elseJump);
     }
 
     public void printStatement() {
         expression();
         consume(SEMICOLON, "Expect ';' after value");
         emitByte(OpCode.PRINT);
+    }
+
+    public void whileStatement() {
+        int loopStart = compilingChunk.getCodesCount();
+        consume(LEFT_PAREN, "Expect '(' after 'while'");
+        expression();
+        consume(RIGHT_PAREN, "Expect ')' after condition");
+
+        int exitJump = emitJump(OpCode.JUMP_IF_FALSE);
+        emitByte(OpCode.POP);
+        statement();
+        emitLoop(loopStart);
+
+        patchJump(exitJump);
+        emitByte(OpCode.POP);
     }
 
     public void namedVariable(Token name, boolean canAssign) {
@@ -259,6 +334,18 @@ public class Compiler {
     public void emitBytes(byte b1, byte b2) {
         emitByte(b1);
         emitByte(b2);
+    }
+
+    public void emitLoop(int loopStart) {
+        emitByte(OpCode.LOOP);
+
+        int offset = compilingChunk.getCodesCount() - loopStart + 2;
+        if (offset > 65535) {
+            errorAt(parser.getCurrent(), "Loop body too large");
+        }
+
+        emitByte((byte) ((offset >> 8) & 0xFF));
+        emitByte((byte) (offset & 0xFF));
     }
 
     public int emitJump(byte instruction) {

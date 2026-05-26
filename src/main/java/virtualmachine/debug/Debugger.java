@@ -41,6 +41,9 @@ public class Debugger {
             case OpCode.NOT -> simpleInstruction("OP_NOT", offset);
             case OpCode.NEGATE -> simpleInstruction("OP_NEGATE", offset);
             case OpCode.PRINT -> simpleInstruction("OP_PRINT", offset);
+            case OpCode.JUMP -> jumpInstruction("OP_JUMP",1,chunk, offset);
+            case OpCode.JUMP_IF_FALSE -> jumpInstruction("OP_JUMP_IF_FALSE", 1, chunk, offset);
+            case OpCode.LOOP -> jumpInstruction("OP_LOOP", -1, chunk, offset);
             case OpCode.RETURN -> simpleInstruction("OP_RETURN", offset);
             default -> {
                 System.out.printf("Unknown opcode %d\n", instruction);
@@ -66,5 +69,13 @@ public class Debugger {
         byte slot = chunk.getCodeAt(offset + 1);
         System.out.printf("%-16s %4d\n", name, slot);
         return offset + 2;
+    }
+
+    private int jumpInstruction(String name, int sign, Chunk chunk, int offset) {
+        byte high = chunk.getCodeAt(offset + 1);
+        byte low = chunk.getCodeAt(offset + 2);
+        short jump = (short) (high | low);
+        System.out.printf("%-16s %4d -> %d\n", name, offset, offset + 3 + sign * jump);
+        return offset + 3;
     }
 }

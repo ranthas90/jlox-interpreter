@@ -9,7 +9,7 @@ import java.util.Map;
 
 public class VirtualMachine {
 
-    private byte instructionPointer;
+    private int instructionPointer;
     private Chunk chunk;
     private Object[] valueStack;
     private int valueStackCount;
@@ -55,7 +55,6 @@ public class VirtualMachine {
                     System.out.printf("[ %s ]", slot);
                 }
             }
-            // TODO: si la pila está vacía, imprimirlo, junto con la info de los espacios ocupados y los totales (1/256)
             System.out.println();
             debugger.disassembleInstruction(this.chunk, this.instructionPointer);
             byte instruction;
@@ -64,8 +63,6 @@ public class VirtualMachine {
                     int constantIndex = chunk.getCodeAt(instructionPointer++);
                     Object constant = chunk.getConstantAt(constantIndex);
                     pushValue(constant);
-                    System.out.printf("%s", constant);
-                    System.out.println();
                 }
                 case OpCode.NIL -> pushValue(null);
                 case OpCode.TRUE -> pushValue(true);
@@ -120,20 +117,28 @@ public class VirtualMachine {
                         runtimeError(instruction, "Operands must be numbers");
                         return InterpretResult.INTERPRET_RUNTIME_ERROR;
                     }
-                    pushValue(((Double) popValue()) > ((Double) popValue()));
+                    Double b = (Double) popValue();
+                    Double a = (Double) popValue();
+                    pushValue(a > b);
                 }
                 case OpCode.LESS -> {
                     if (!(peekValue(0) instanceof Double) || !(peekValue(1) instanceof Double)) {
                         runtimeError(instruction, "Operands must be numbers");
                         return InterpretResult.INTERPRET_RUNTIME_ERROR;
                     }
-                    pushValue(((Double) popValue()) < ((Double) popValue()));
+                    Double b = (Double) popValue();
+                    Double a = (Double) popValue();
+                    pushValue(a < b);
                 }
                 case OpCode.ADD -> {
                     if (peekValue(0) instanceof String && peekValue(1) instanceof String) {
-                        pushValue(((String) popValue()) + ((String) popValue()));
+                        String b = (String) popValue();
+                        String a = (String) popValue();
+                        pushValue(a + b);
                     } else if (peekValue(0) instanceof Double && peekValue(1) instanceof Double) {
-                        pushValue(((Double) popValue()) + ((Double) popValue()));
+                        Double b = (Double) popValue();
+                        Double a = (Double) popValue();
+                        pushValue(a + b);
                     } else {
                         runtimeError(instruction, "Operands must be numbers");
                         return InterpretResult.INTERPRET_RUNTIME_ERROR;
@@ -144,21 +149,27 @@ public class VirtualMachine {
                         runtimeError(instruction, "Operands must be numbers");
                         return InterpretResult.INTERPRET_RUNTIME_ERROR;
                     }
-                    pushValue(((Double) popValue()) - ((Double) popValue()));
+                    Double b = (Double) popValue();
+                    Double a = (Double) popValue();
+                    pushValue(a - b);
                 }
                 case OpCode.MULTIPLY -> {
                     if (!(peekValue(0) instanceof Double) || !(peekValue(1) instanceof Double)) {
                         runtimeError(instruction, "Operands must be numbers");
                         return InterpretResult.INTERPRET_RUNTIME_ERROR;
                     }
-                    pushValue(((Double) popValue()) * ((Double) popValue()));
+                    Double b = (Double) popValue();
+                    Double a = (Double) popValue();
+                    pushValue(a * b);
                 }
                 case OpCode.DIVIDE -> {
                     if (!(peekValue(0) instanceof Double) || !(peekValue(1) instanceof Double)) {
                         runtimeError(instruction, "Operands must be numbers");
                         return InterpretResult.INTERPRET_RUNTIME_ERROR;
                     }
-                    pushValue(((Double) popValue()) / ((Double) popValue()));
+                    Double b = (Double) popValue();
+                    Double a = (Double) popValue();
+                    pushValue(a / b);
                 }
                 case OpCode.NOT -> pushValue(isFalsey(popValue()));
                 case OpCode.NEGATE -> {
@@ -172,13 +183,26 @@ public class VirtualMachine {
                     System.out.printf("%s", popValue());
                     System.out.println();
                 }
+                case OpCode.JUMP -> {
+                    int high = chunk.getCodeAt(instructionPointer++);
+                    int low = chunk.getCodeAt(instructionPointer++);
+                    short offset = (short) (((high & 0xFF) << 8) | (low & 0xFF));
+                    instructionPointer = instructionPointer + offset;
+                }
                 case OpCode.JUMP_IF_FALSE -> {
-                    short offset = 0; // TODO: POR HACER, MIRAR EL EQUIVALENTE EN C:
-                    //#define READ_SHORT() \
-                    //    (vm.ip += 2, (uint16_t)((vm.ip[-2] << 8) | vm.ip[-1]))
+                    int high = chunk.getCodeAt(instructionPointer++);
+                    int low = chunk.getCodeAt(instructionPointer++);
+                    short offset = (short) (((high & 0xFF) << 8) | (low & 0xFF));
+
                     if (isFalsey(peekValue(0))) {
-                        instructionPointer = (byte) ((int) instructionPointer + offset);
+                        instructionPointer = instructionPointer + offset;
                     }
+                }
+                case OpCode.LOOP -> {
+                    int high = chunk.getCodeAt(instructionPointer++);
+                    int low = chunk.getCodeAt(instructionPointer++);
+                    short offset = (short) (((high & 0xFF) << 8) | (low & 0xFF));
+                    instructionPointer = instructionPointer - offset;
                 }
                 case OpCode.RETURN -> {
                     return InterpretResult.INTERPRET_OK;
