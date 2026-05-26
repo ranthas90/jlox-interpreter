@@ -1,7 +1,9 @@
 package virtualmachine.vm;
 
-import virtualmachine.compiler.*;
 import virtualmachine.compiler.Compiler;
+import virtualmachine.compiler.Function;
+import virtualmachine.compiler.FunctionType;
+import virtualmachine.compiler.OpCode;
 import virtualmachine.debug.Debugger;
 
 import java.util.HashMap;
@@ -9,15 +11,15 @@ import java.util.Map;
 
 public class VirtualMachine {
 
-    private int instructionPointer;
-    private Chunk chunk;
+    private CallFrame[] frames;
+    private int frameCount;
     private Object[] valueStack;
     private int valueStackCount;
     private int valueStackTop;
     private Map<String, Object> globals;
 
     private Debugger debugger = new Debugger();
-    private Compiler compiler = new Compiler();
+    private Compiler compiler = new Compiler(FunctionType.SCRIPT);
 
     public enum InterpretResult {
         INTERPRET_OK,
@@ -27,26 +29,31 @@ public class VirtualMachine {
 
     public InterpretResult interpret(String source) {
 
-        this.chunk = new Chunk();
-        this.instructionPointer = 0;
-        this.valueStack = new Object[256];
+        this.frames = new CallFrame[64]; // TODO: FRAMES_MAX
+        this.frameCount = 0;
+        this.valueStack = new Object[64 * 256]; // TODO: FRAMES_MAX * UINT8_COUNT
         this.valueStackCount = 0;
         this.valueStackTop = 0;
         this.globals = new HashMap<>();
 
-        if (!compiler.compile(source, chunk)) {
-            chunk.free();
+        Function function = compiler.compile(source);
+        if (function == null) {
             return InterpretResult.INTERPRET_COMPILE_ERROR;
         }
 
+        pushValue(function);
+        CallFrame frame = new CallFrame();
+        frame.setFunction(function);
+        frame.setInstructionPointer(0);
+        frame.setSlots(valueStack);
 
-        InterpretResult result = run();
-        chunk.free();
+        frames[frameCount++] = frame;
 
-        return result;
+        return run();
     }
 
     private InterpretResult run() {
+        CallFrame frame = frames[frameCount - 1];
         System.out.println("=== Running interpreter ===");
         while (true) {
             System.out.printf("Stack: (%d/%d) ::           ", valueStackCount, valueStack.length);
@@ -56,31 +63,18 @@ public class VirtualMachine {
                 }
             }
             System.out.println();
-            debugger.disassembleInstruction(this.chunk, this.instructionPointer);
+            debugger.disassembleInstruction(frame.getFunction().getChunk(), frame.getInstructionPointer());
             byte instruction;
-            switch (instruction = chunk.getCodeAt(instructionPointer++)) {
-                case OpCode.CONSTANT -> {
-                    int constantIndex = chunk.getCodeAt(instructionPointer++);
-                    Object constant = chunk.getConstantAt(constantIndex);
-                    pushValue(constant);
-                }
+            switch (instruction = readByte(frame)) {
+                case OpCode.CONSTANT -> pushValue(readConstant(frame));
                 case OpCode.NIL -> pushValue(null);
                 case OpCode.TRUE -> pushValue(true);
                 case OpCode.FALSE -> pushValue(false);
                 case OpCode.POP -> popValue();
-                case OpCode.GET_LOCAL -> {
-                    // TODO: revisar esto, los casteos byte <--> int son muy locos
-                    byte slot = chunk.getCodeAt(instructionPointer);
-                    pushValue(valueStack[slot]);
-                }
-                case OpCode.SET_LOCAL -> {
-                    // TODO: revisar esto, los casteos byte <--> int son muy locos
-                    byte slot = chunk.getCodeAt(instructionPointer);
-                    valueStack[slot] = peekValue(0);
-                }
+                case OpCode.GET_LOCAL -> pushValue(frame.getSlots()[readByte(frame)]);
+                case OpCode.SET_LOCAL -> frame.writeSlot(peekValue(0), readByte(frame));
                 case OpCode.GET_GLOBAL -> {
-                    int constantIndex = chunk.getCodeAt(instructionPointer++);
-                    Object constant = chunk.getConstantAt(constantIndex);
+                    Object constant = readConstant(frame);
                     Object constantValue = globals.get((String) constant);
                     if (constantValue == null) {
                         runtimeError(instruction, "Undefined variable '" + constant + "'");
@@ -89,19 +83,17 @@ public class VirtualMachine {
                     pushValue(constantValue);
                 }
                 case OpCode.DEFINE_GLOBAL -> {
-                    int constantIndex = chunk.getCodeAt(instructionPointer++);
-                    Object constant = chunk.getConstantAt(constantIndex);
-                    globals.put((String)constant, peekValue(0));
+                    Object constant = readConstant(frame);
+                    globals.put((String) constant, peekValue(0));
                     popValue();
                 }
                 case OpCode.SET_GLOBAL -> {
-                    int constantIndex = chunk.getCodeAt(instructionPointer++);
-                    Object constant = chunk.getConstantAt(constantIndex);
+                    Object constant = readConstant(frame);
                     if (!globals.containsKey((String) constant)) {
                         runtimeError(instruction, "Undefined variable '" + constant + "'");
                         return InterpretResult.INTERPRET_RUNTIME_ERROR;
                     }
-                    globals.put((String)constant, peekValue(0));
+                    globals.put((String) constant, peekValue(0));
                 }
                 case OpCode.EQUAL -> {
                     Object a = popValue();
@@ -177,32 +169,25 @@ public class VirtualMachine {
                         runtimeError(instruction, "Operand must be a number");
                         return InterpretResult.INTERPRET_RUNTIME_ERROR;
                     }
-                    pushValue(((Double)popValue()) * -1.0D);
+                    pushValue(((Double) popValue()) * -1.0D);
                 }
                 case OpCode.PRINT -> {
                     System.out.printf("%s", popValue());
                     System.out.println();
                 }
                 case OpCode.JUMP -> {
-                    int high = chunk.getCodeAt(instructionPointer++);
-                    int low = chunk.getCodeAt(instructionPointer++);
-                    short offset = (short) (((high & 0xFF) << 8) | (low & 0xFF));
-                    instructionPointer = instructionPointer + offset;
+                    short offset = readShort(frame);
+                    frame.setInstructionPointer(frame.getInstructionPointer() + offset);
                 }
                 case OpCode.JUMP_IF_FALSE -> {
-                    int high = chunk.getCodeAt(instructionPointer++);
-                    int low = chunk.getCodeAt(instructionPointer++);
-                    short offset = (short) (((high & 0xFF) << 8) | (low & 0xFF));
-
+                    short offset = readShort(frame);
                     if (isFalsey(peekValue(0))) {
-                        instructionPointer = instructionPointer + offset;
+                        frame.setInstructionPointer(frame.getInstructionPointer() + offset);
                     }
                 }
                 case OpCode.LOOP -> {
-                    int high = chunk.getCodeAt(instructionPointer++);
-                    int low = chunk.getCodeAt(instructionPointer++);
-                    short offset = (short) (((high & 0xFF) << 8) | (low & 0xFF));
-                    instructionPointer = instructionPointer - offset;
+                    short offset = readShort(frame);
+                    frame.setInstructionPointer(frame.getInstructionPointer() - offset);
                 }
                 case OpCode.RETURN -> {
                     return InterpretResult.INTERPRET_OK;
@@ -234,7 +219,7 @@ public class VirtualMachine {
 
     private Object peekValue(int distance) {
         //return valueStack[-1 - distance];
-        return valueStack[valueStackTop -1 - distance];
+        return valueStack[valueStackTop - 1 - distance];
     }
 
     private void resetValueStack() {
@@ -245,12 +230,32 @@ public class VirtualMachine {
 
     private void runtimeError(byte instruction, String message) {
         System.err.println(message);
-        int line = chunk.getLineAt(instruction);
+        CallFrame frame = frames[frameCount - 1];
+        int line = frame.getFunction().getChunk().getLineAt(instruction);
         System.err.printf("[line %d] in script\n", line);
         resetValueStack();
     }
 
     private boolean isFalsey(Object value) {
         return value == null || (value instanceof Boolean && !((Boolean) value));
+    }
+
+    private byte readByte(CallFrame frame) {
+        byte byteRead = frame.getFunction().getChunk().getCodeAt(frame.getInstructionPointer());
+        frame.incrementInstructionPointer();
+        return byteRead;
+    }
+
+    private Object readConstant(CallFrame frame) {
+        byte byteRead = readByte(frame);
+        return frame.getFunction().getChunk().getConstantAt(byteRead);
+    }
+
+    private short readShort(CallFrame frame) {
+        int high = frame.getFunction().getChunk().getCodeAt(frame.getInstructionPointer());
+        frame.incrementInstructionPointer();
+        int low = frame.getFunction().getChunk().getCodeAt(frame.getInstructionPointer());
+        frame.incrementInstructionPointer();
+        return (short) (((high & 0xFF) << 8) | (low & 0xFF));
     }
 }

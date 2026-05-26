@@ -14,19 +14,24 @@ import static virtualmachine.scanner.TokenType.*;
 
 public class Compiler {
 
+    private Compiler enclosing;
     private Scanner scanner;
     private Parser parser;
     private Locals currentLocals;
+    private Function function;
+    private FunctionType type;
     private Debugger debugger;
-    private Chunk compilingChunk;
     private Map<TokenType, ParseRule> rules;
 
     // *********************************************************************
     // Init
 
-    public Compiler() {
+    public Compiler(FunctionType type) {
+        enclosing = this;
         parser = new Parser();
         currentLocals = new Locals();
+        function = new Function();
+        this.type = type;
         debugger = new Debugger();
         initRules();
     }
@@ -82,19 +87,16 @@ public class Compiler {
     // *********************************************************************
     // Public methods
 
-    public boolean compile(String source, Chunk chunk) {
+    public Function compile(String source) {
         scanner = new Scanner(source);
-        compilingChunk = chunk;
-
         advance();
 
         while(!match(TokenType.EOF)) {
             declaration();
         }
 
-        endCompiler();
-
-        return !parser.isHadError();
+        Function function = endCompiler();
+        return parser.isHadError() ? null : function;
     }
 
     public Parser getParser() {
@@ -110,7 +112,9 @@ public class Compiler {
     }
 
     public void declaration() {
-        if (match(VAR)) {
+        if (match(FUN)) {
+            funDeclaration();
+        }else if (match(VAR)) {
             varDeclaration();
         } else {
             statement();
@@ -159,6 +163,26 @@ public class Compiler {
         consume(RIGHT_BRACE, "Expect '}' after block");
     }
 
+    public void function(FunctionType type) {
+        Compiler compiler = new Compiler(type);
+        beginScope();
+
+        consume(LEFT_PAREN, "Expect '(' after function name");
+        consume(RIGHT_PAREN, "Expect ')' after parameters");
+        consume(LEFT_BRACE, "Expect '{' before function body");
+        block();
+
+        Function function = endCompiler();
+        emitBytes(OpCode.CONSTANT, makeConstant(function));
+    }
+
+    public void funDeclaration() {
+        byte global = parseVariable("Expect function name");
+        markInitialized();
+        function(FunctionType.FUNCTION);
+        defineVariable(global);
+    }
+
     public void expressionStatement() {
         expression();
         consume(SEMICOLON, "Expect ';' after expression");
@@ -176,7 +200,7 @@ public class Compiler {
             expressionStatement();
         }
 
-        int loopStart = compilingChunk.getCodesCount();
+        int loopStart = currentChunk().getCodesCount();
         int exitJump = -1;
         if (!match(SEMICOLON)) {
             expression();
@@ -191,7 +215,7 @@ public class Compiler {
 
         if (!match(RIGHT_PAREN)) {
             int bodyJump = emitJump(OpCode.JUMP);
-            int incrementStart = compilingChunk.getCodesCount();
+            int incrementStart = currentChunk().getCodesCount();
             expression();
             emitByte(OpCode.POP);
             consume(RIGHT_PAREN, "Expect ')' after for clauses");
@@ -239,7 +263,7 @@ public class Compiler {
     }
 
     public void whileStatement() {
-        int loopStart = compilingChunk.getCodesCount();
+        int loopStart = currentChunk().getCodesCount();
         consume(LEFT_PAREN, "Expect '(' after 'while'");
         expression();
         consume(RIGHT_PAREN, "Expect ')' after condition");
@@ -315,6 +339,9 @@ public class Compiler {
     }
 
     public void markInitialized() {
+        if (currentLocals.getScopeDepth() == 0) {
+            return;
+        }
         currentLocals.markInitialized();
     }
 
@@ -328,7 +355,7 @@ public class Compiler {
     }
 
     public void emitByte(byte aByte) {
-        compilingChunk.writeCode(aByte, parser.getPrevious().getLine());
+        currentChunk().writeCode(aByte, parser.getPrevious().getLine());
     }
 
     public void emitBytes(byte b1, byte b2) {
@@ -339,7 +366,7 @@ public class Compiler {
     public void emitLoop(int loopStart) {
         emitByte(OpCode.LOOP);
 
-        int offset = compilingChunk.getCodesCount() - loopStart + 2;
+        int offset = currentChunk().getCodesCount() - loopStart + 2;
         if (offset > 65535) {
             errorAt(parser.getCurrent(), "Loop body too large");
         }
@@ -353,22 +380,22 @@ public class Compiler {
         emitByte((byte) 0xFF);
         emitByte((byte) 0xFF);
 
-        return compilingChunk.getCodesCount() - 2;
+        return currentChunk().getCodesCount() - 2;
     }
 
     public void patchJump(int offset) {
         // emitJump returns current byte with -2 offset!
-        int jump = compilingChunk.getCodesCount() - offset - 2;
+        int jump = currentChunk().getCodesCount() - offset - 2;
         if (jump > 65535) {
             errorAt(parser.getCurrent(), "Too much code to jump over");
         }
 
-        compilingChunk.setCodeAt(offset, ((byte) ((jump >> 8) & 0xFF)));
-        compilingChunk.setCodeAt(offset + 1, ((byte) (jump & 0xFF)));
+        currentChunk().setCodeAt(offset, ((byte) ((jump >> 8) & 0xFF)));
+        currentChunk().setCodeAt(offset + 1, ((byte) (jump & 0xFF)));
     }
 
     public byte makeConstant(Object value) {
-        int constantIndex = compilingChunk.writeConstant(value);
+        int constantIndex = currentChunk().writeConstant(value);
         if (constantIndex > Chunk.MAX_CONSTANTS_CAPACITY) {
             errorAt(parser.getPrevious(), "Too many constants in one chunk");
             constantIndex = 0;
@@ -490,11 +517,17 @@ public class Compiler {
         emitByte(OpCode.RETURN);
     }
 
-    private void endCompiler() {
+    private Function endCompiler() {
         emitReturn();
         if (!parser.isHadError()) {
-            debugger.disassembleChunk(compilingChunk, "code");
+            debugger.disassembleChunk(currentChunk(), function.getName() != null ? function.getName() : "<script>");
         }
+        this = enclosing;
+        return function;
+    }
+
+    private Chunk currentChunk() {
+        return function.getChunk();
     }
 
     private void errorAt(Token token, String message) {
