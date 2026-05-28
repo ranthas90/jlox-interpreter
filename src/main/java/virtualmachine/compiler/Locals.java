@@ -6,10 +6,22 @@ public class Locals {
     private int localCount;
     private int scopeDepth;
 
-    public Locals() {
-        locals = new Local[256]; // TODO: chequear cuanto hay que poner aqui, Integer.MAX_VALUE - 1 es demasiado
+    private Locals enclosing;
+    private Function function;
+    private FunctionType type;
+
+    private static final int MAX_SIGNED_BYTE = 127;
+
+    public Locals(Locals enclosing, FunctionType type, String functionName) {
+        this.enclosing = enclosing;
+        this.type = type;
+
+        function = new Function(functionName);
+        locals = new Local[MAX_SIGNED_BYTE];
         localCount = 0;
         scopeDepth = 0;
+
+        // TODO: revisar capítulo de funciones donde se reserva el stack 0 para la propia llamada de la función
     }
 
     public Local[] getLocals() {
@@ -32,6 +44,18 @@ public class Locals {
         this.scopeDepth = scopeDepth;
     }
 
+    public Function getFunction() {
+        return function;
+    }
+
+    public void setFunction(Function function) {
+        this.function = function;
+    }
+
+    public Locals getEnclosing() {
+        return enclosing;
+    }
+
     public Local getAt(int offset) {
         return locals[offset];
     }
@@ -50,5 +74,10 @@ public class Locals {
 
     public void markInitialized() {
         locals[localCount - 1].setDepth(scopeDepth);
+    }
+
+    public void addLocal(Local local) {
+        locals[localCount] = local;
+        localCount++;
     }
 }

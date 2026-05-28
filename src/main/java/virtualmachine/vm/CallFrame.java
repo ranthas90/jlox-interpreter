@@ -4,9 +4,14 @@ import virtualmachine.compiler.Function;
 
 public class CallFrame {
 
+    // Ongoing function call
     private Function function;
-    private int instructionPointer;
-    private Object[] slots;
+
+    // Instruction pointer for returning address
+    private int returnPointer;
+
+    // Pointer to function's first slot
+    private int basePointer;
 
     public Function getFunction() {
         return function;
@@ -16,27 +21,23 @@ public class CallFrame {
         this.function = function;
     }
 
-    public int getInstructionPointer() {
-        return instructionPointer;
+    public int getReturnPointer() {
+        return returnPointer;
     }
 
-    public void setInstructionPointer(int instructionPointer) {
-        this.instructionPointer = instructionPointer;
+    public void setReturnPointer(int returnPointer) {
+        this.returnPointer = returnPointer;
     }
 
-    public Object[] getSlots() {
-        return slots;
+    public int getBasePointer() {
+        return basePointer;
     }
 
-    public void setSlots(Object[] slots) {
-        this.slots = slots;
+    public void setBasePointer(int basePointer) {
+        this.basePointer = basePointer;
     }
 
-    public void incrementInstructionPointer() {
-        instructionPointer++;
-    }
-
-    public void writeSlot(Object slot, int offset) {
-        slots[offset] = slot;
+    public void incrementReturnPointer() {
+        returnPointer++;
     }
 }

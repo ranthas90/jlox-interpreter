@@ -17,8 +17,6 @@ public class Compiler {
     private Scanner scanner;
     private Parser parser;
     private Locals currentLocals;
-    private Function function;
-    private FunctionType type;
     private Debugger debugger;
     private Map<TokenType, ParseRule> rules;
 
@@ -27,20 +25,13 @@ public class Compiler {
 
     public Compiler(FunctionType type) {
         parser = new Parser();
-        currentLocals = new Locals();
-        function = new Function();
-        this.type = type;
         debugger = new Debugger();
         initRules();
-
-        if (type != FunctionType.SCRIPT) {
-            function.setName((String) parser.getPrevious().getLiteral());
-        }
     }
 
     private void initRules() {
         rules = new HashMap<>();
-        addRule(LEFT_PAREN,     new GroupingParseFn(),  new CallParseFn(),      NONE);
+        addRule(LEFT_PAREN,     new GroupingParseFn(),  new CallParseFn(),      CALL);
         addRule(RIGHT_PAREN,    null,                   null,                   NONE);
         addRule(LEFT_BRACE,     null,                   null,                   NONE);
         addRule(RIGHT_BRACE,    null,                   null,                   NONE);
@@ -92,6 +83,9 @@ public class Compiler {
     public Function compile(String source) {
         scanner = new Scanner(source);
         advance();
+
+        // Inicializa locales
+        currentLocals = new Locals(null, FunctionType.SCRIPT, null);
 
         while(!match(TokenType.EOF)) {
             declaration();
@@ -166,14 +160,19 @@ public class Compiler {
     }
 
     public void function(FunctionType type) {
-        Compiler compiler = new Compiler(type);
+
+        // Inicializa un contexto para las variables locales de la función
+        // Luego hace que el contexto actual sea el nuevo que hemos creado
+        Locals functionLocals = new Locals(currentLocals, type, (String) parser.getPrevious().getLiteral());
+        currentLocals = functionLocals;
+
         beginScope();
 
         consume(LEFT_PAREN, "Expect '(' after function name");
         if (!check(RIGHT_PAREN)) {
             do {
-                function.incrementArity();
-                if (function.getArity() > 255) {
+                functionLocals.getFunction().incrementArity();
+                if (functionLocals.getFunction().getArity() > 255) {
                     errorAt(parser.getCurrent(), "Can't have more than 255 parameters"); // Este errorAt esta bien, cambiar el resto por previous
                 }
                 byte constant = parseVariable("Expect parameter name");
@@ -299,7 +298,7 @@ public class Compiler {
             setOperation = OpCode.SET_LOCAL;
         } else {
             arg = identifierConstant(name);
-            getOperation = OpCode.SET_GLOBAL;
+            getOperation = OpCode.GET_GLOBAL;
             setOperation = OpCode.SET_GLOBAL;
         }
 
@@ -316,7 +315,7 @@ public class Compiler {
             advance();
             return;
         }
-        errorAt(parser.getCurrent(), message);
+        errorAt(parser.getCurrent(), message); // TODO: este error_at está correcto
     }
 
     public void parsePrecedence(int precedence) {
@@ -522,9 +521,8 @@ public class Compiler {
             return;
         }
 
-        Local local = currentLocals.getLocals()[currentLocals.getLocalCount() + 1];
-        local.setName(name);
-        local.setDepth(-1);
+        Local local = new Local(name, currentLocals.getScopeDepth());
+        currentLocals.addLocal(local);
     }
 
     // Skip tokens until we reach a statement boundary (semicolon).
@@ -547,14 +545,22 @@ public class Compiler {
 
     private Function endCompiler() {
         emitReturn();
+
+        // Extracts the current function
+        Function function = currentLocals.getFunction();
+
         if (!parser.isHadError()) {
-            debugger.disassembleChunk(currentChunk(), function.getName() != null ? function.getName() : "<script>");
+            debugger.disassembleChunk(function.getChunk(), function.getName() != null ? function.getName() : "<script>");
         }
+
+        // Restores previous locals context
+        currentLocals = currentLocals.getEnclosing();
+
         return function;
     }
 
     private Chunk currentChunk() {
-        return function.getChunk();
+        return currentLocals.getFunction().getChunk();
     }
 
     private void errorAt(Token token, String message) {

@@ -7,9 +7,9 @@ public class Function {
     private Chunk chunk;
     private String name;
 
-    public Function() {
+    public Function(String name) {
         arity = 0;
-        name = null;
+        this.name = name;
         chunk = new Chunk();
     }
 
