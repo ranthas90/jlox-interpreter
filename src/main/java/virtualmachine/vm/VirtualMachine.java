@@ -14,7 +14,6 @@ public class VirtualMachine {
     private CallFrame[] frames;
     private int frameCount;
     private Object[] valueStack;
-    private int valueStackCount;
     private int valueStackTop;
     private Map<String, Object> globals;
 
@@ -27,14 +26,20 @@ public class VirtualMachine {
         INTERPRET_RUNTIME_ERROR
     }
 
+    public VirtualMachine() {
+        // TODO: mover aquí las distintas inicializaciones de frames, value stack ,compiler, etc
+        globals = new HashMap<>();
+
+        defineNativeFunction("clock", new ClockNativeFn());
+        resetValueStack();
+    }
+
     public InterpretResult interpret(String source) {
 
         this.frames = new CallFrame[64]; // TODO: FRAMES_MAX
         this.frameCount = 0;
         this.valueStack = new Object[64 * 256]; // TODO: FRAMES_MAX * UINT8_COUNT
-        this.valueStackCount = 0; // TODO: El count sobra, tiene siempre el mismo valor que top (o deberia)
         this.valueStackTop = 0;
-        this.globals = new HashMap<>();
 
         Function function = compiler.compile(source);
         if (function == null) {
@@ -51,14 +56,21 @@ public class VirtualMachine {
         CallFrame frame = frames[frameCount - 1];
         System.out.println("=== Running interpreter ===");
         while (true) {
-            System.out.printf("Stack: (%d/%d) ::           ", valueStackCount, valueStack.length);
-            for (Object slot : valueStack) { // TODO: No iterar por todos, solo hasta valueStackTop!
-                if (slot != null) {
-                    System.out.printf("[ %s ]", slot);
-                }
+            // Print stack
+            System.out.print("Stack   ::           ");
+            for (int i = 0; i < valueStackTop; i++) {
+                System.out.printf("[ %s ]", valueStack[i]);
             }
             System.out.println();
+
+            // Print globals
+            System.out.print("Globals ::           ");
+            globals.forEach((key, val) -> System.out.printf("[ %s :: %s ]", key, val));
+
+            System.out.println("Current IP: " + frame.getReturnPointer());
+
             debugger.disassembleInstruction(frame.getFunction().getChunk(), frame.getReturnPointer());
+            System.out.println();
             byte instruction;
             switch (instruction = readByte(frame)) {
                 case OpCode.CONSTANT -> pushValue(readConstant(frame));
@@ -199,7 +211,16 @@ public class VirtualMachine {
                     frame = frames[frameCount - 1];
                 }
                 case OpCode.RETURN -> {
-                    return InterpretResult.INTERPRET_OK;
+                    Object result = popValue();
+                    frameCount--;
+                    if (frameCount == 0) {
+                        popValue();
+                        return InterpretResult.INTERPRET_OK;
+                    }
+
+                    valueStackTop = frame.getBasePointer();
+                    pushValue(result);
+                    frame = frames[frameCount - 1];
                 }
             }
         }
@@ -212,7 +233,6 @@ public class VirtualMachine {
         }
         valueStack[valueStackTop] = value;
         valueStackTop++;
-        valueStackCount++;
     }
 
     private void pushFrame(CallFrame frame) {
@@ -226,13 +246,16 @@ public class VirtualMachine {
             throw new RuntimeException("Value stack is already empty");
         }
         valueStackTop--;
-        valueStackCount--;
         // TODO: ¿ponemos a NULL el valor que acabamos de popear de la pila?
         return valueStack[valueStackTop];
     }
 
     private Object peekValue(int distance) {
         return valueStack[valueStackTop - 1 - distance];
+    }
+
+    private void defineNativeFunction(String name, NativeFn nativeFn) {
+        globals.put(name, nativeFn);
     }
 
     private boolean call(Function function, int argCount) {
@@ -249,7 +272,7 @@ public class VirtualMachine {
         CallFrame frame = new CallFrame();
         frame.setFunction(function);
         frame.setReturnPointer(0);
-        frame.setBasePointer(valueStackTop - argCount);
+        frame.setBasePointer(valueStackTop - 1 - argCount);
 
         pushFrame(frame);
         return true;
@@ -258,6 +281,13 @@ public class VirtualMachine {
     private boolean callValue(Object callee, int argCount) {
         if (callee instanceof Function) {
             return call((Function) callee, argCount);
+        } else if (callee instanceof NativeFn) {
+            NativeFn nativeFn = (NativeFn) callee;
+            // TODO: los parametros los sacamos contando hacia atras desde stackTop un total de argCount veces,
+            Object result = nativeFn.call();
+            valueStackTop = valueStackTop - (argCount + 1);
+            pushValue(result);
+            return true;
         }
         runtimeError("Can only call functions and classes");
         return false;
@@ -266,7 +296,6 @@ public class VirtualMachine {
     private void resetValueStack() {
         valueStack = new Object[256];
         valueStackTop = 0;
-        valueStackCount = 0;
     }
 
     private void runtimeError(String message) {

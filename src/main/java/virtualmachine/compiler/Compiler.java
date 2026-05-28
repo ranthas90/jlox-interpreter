@@ -141,7 +141,9 @@ public class Compiler {
             forStatement();
         } else if (match(IF)) {
             ifStatement();
-        }else if (match(WHILE)) {
+        } else if (match(RETURN)) {
+            returnStatement();
+        } else if (match(WHILE)) {
             whileStatement();
         } else if (match(LEFT_BRACE)) {
             beginScope();
@@ -274,6 +276,20 @@ public class Compiler {
         emitByte(OpCode.PRINT);
     }
 
+    public void returnStatement() {
+        if (currentLocals.getType() == FunctionType.SCRIPT) {
+            errorAt(parser.getPrevious(), "Can't return from top-level code");
+        }
+
+        if (match(SEMICOLON)) {
+            emitReturn();
+        } else {
+            expression();
+            consume(SEMICOLON, "Expect ';' after return value");
+            emitByte(OpCode.RETURN);
+        }
+    }
+
     public void whileStatement() {
         int loopStart = currentChunk().getCodesCount();
         consume(LEFT_PAREN, "Expect '(' after 'while'");
@@ -344,7 +360,7 @@ public class Compiler {
         declareVariable();
 
         if (currentLocals.getScopeDepth() > 0) {
-            return 0x0;
+            return (byte) 0;
         }
 
         return identifierConstant(parser.getPrevious());
@@ -516,7 +532,7 @@ public class Compiler {
     }
 
     private void addLocal(Token name) {
-        if (currentLocals.getLocalCount() == (Integer.MAX_VALUE -1)) {
+        if (currentLocals.getLocalCount() >= 127) {
             errorAt(parser.getCurrent(), "Too many local variables in function");
             return;
         }
@@ -540,6 +556,7 @@ public class Compiler {
     }
 
     private void emitReturn() {
+        emitByte(OpCode.NIL);
         emitByte(OpCode.RETURN);
     }
 

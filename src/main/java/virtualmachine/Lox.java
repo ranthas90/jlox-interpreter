@@ -29,16 +29,19 @@ public class Lox {
         InputStreamReader inputStreamReader = new InputStreamReader(System.in);
         BufferedReader bufferedReader = new BufferedReader(inputStreamReader);
         boolean keepRunning = true;
+        String line = "";
 
-        while (keepRunning) {
+        while (true) {
             System.out.print("> ");
-            String line = bufferedReader.readLine();
-            if (line == null || line.isBlank()) {
+            String current = bufferedReader.readLine();
+            if (current == null || current.isBlank()) {
                 break;
             }
-            VirtualMachine.InterpretResult result = virtualMachine.interpret(line);
-            keepRunning = result == VirtualMachine.InterpretResult.INTERPRET_OK;
+            line = line + current;
         }
+
+        VirtualMachine.InterpretResult result = virtualMachine.interpret(line);
+        keepRunning = result == VirtualMachine.InterpretResult.INTERPRET_OK;
     }
 
     private static void runFile(String path) throws IOException {

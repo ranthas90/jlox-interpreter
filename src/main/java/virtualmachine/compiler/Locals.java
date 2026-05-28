@@ -1,5 +1,7 @@
 package virtualmachine.compiler;
 
+import virtualmachine.scanner.Token;
+
 public class Locals {
 
     private Local[] locals;
@@ -21,7 +23,15 @@ public class Locals {
         localCount = 0;
         scopeDepth = 0;
 
-        // TODO: revisar capítulo de funciones donde se reserva el stack 0 para la propia llamada de la función
+        Token token;
+
+        if (type != FunctionType.FUNCTION) {
+            token = new Token(null, "this", -1);
+        } else {
+            token = new Token(null, "", -1);
+        }
+
+        locals[localCount++] = new Local(token, 0);
     }
 
     public Local[] getLocals() {
@@ -50,6 +60,14 @@ public class Locals {
 
     public void setFunction(Function function) {
         this.function = function;
+    }
+
+    public FunctionType getType() {
+        return type;
+    }
+
+    public void setType(FunctionType type) {
+        this.type = type;
     }
 
     public Locals getEnclosing() {
