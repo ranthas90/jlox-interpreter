@@ -2,12 +2,12 @@ package virtualmachine.compiler;
 
 import virtualmachine.scanner.Token;
 
-public class Local {
+public class LocalVar {
 
     private Token name;
     private int depth;
 
-    public Local(Token name, int depth) {
+    public LocalVar(Token name, int depth) {
         this.name = name;
         this.depth = depth;
     }

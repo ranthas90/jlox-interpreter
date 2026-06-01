@@ -23,7 +23,8 @@ public class Debugger {
         byte instruction = chunk.getCodeAt(offset);
         return switch (instruction) {
             case OpCode.CONSTANT -> constantInstruction("OP_CONSTANT", chunk, offset);
-            case OpCode.NIL -> simpleInstruction("OP_NIL", offset); case OpCode.TRUE -> simpleInstruction("OP_TRUE", offset);
+            case OpCode.NIL -> simpleInstruction("OP_NIL", offset);
+            case OpCode.TRUE -> simpleInstruction("OP_TRUE", offset);
             case OpCode.FALSE -> simpleInstruction("OP_FALSE", offset);
             case OpCode.POP -> simpleInstruction("OP_POP", offset);
             case OpCode.GET_LOCAL -> byteInstruction("OP_GET_LOCAL", chunk, offset);

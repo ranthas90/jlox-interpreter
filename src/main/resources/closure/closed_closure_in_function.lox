@@ -1,11 +1,11 @@
 var f;
 
 {
-  var local = "local";
+  var localVar = "localVar";
   fun f_() {
-    print local;
+    print localVar;
   }
   f = f_;
 }
 
-f(); // expect: local
+f(); // expect: localVar

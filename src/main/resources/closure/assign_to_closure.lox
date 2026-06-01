@@ -2,24 +2,24 @@ var f;
 var g;
 
 {
-  var local = "local";
+  var localVar = "localVar";
   fun f_() {
-    print local;
-    local = "after f";
-    print local;
+    print localVar;
+    localVar = "after f";
+    print localVar;
   }
   f = f_;
 
   fun g_() {
-    print local;
-    local = "after g";
-    print local;
+    print localVar;
+    localVar = "after g";
+    print localVar;
   }
   g = g_;
 }
 
 f();
-// expect: local
+// expect: localVar
 // expect: after f
 
 g();

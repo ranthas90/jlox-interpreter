@@ -16,16 +16,17 @@ public class Compiler {
 
     private Scanner scanner;
     private Parser parser;
-    private Locals currentLocals;
+    private LocalVarsEnvironment currentLocalVars;
     private Debugger debugger;
     private Map<TokenType, ParseRule> rules;
 
     // *********************************************************************
     // Init
 
-    public Compiler(FunctionType type) {
+    public Compiler() {
         parser = new Parser();
         debugger = new Debugger();
+        currentLocalVars = new LocalVarsEnvironment(null, FunctionType.SCRIPT, null);
         initRules();
     }
 
@@ -83,9 +84,6 @@ public class Compiler {
     public Function compile(String source) {
         scanner = new Scanner(source);
         advance();
-
-        // Inicializa locales
-        currentLocals = new Locals(null, FunctionType.SCRIPT, null);
 
         while(!match(TokenType.EOF)) {
             declaration();
@@ -165,16 +163,16 @@ public class Compiler {
 
         // Inicializa un contexto para las variables locales de la función
         // Luego hace que el contexto actual sea el nuevo que hemos creado
-        Locals functionLocals = new Locals(currentLocals, type, (String) parser.getPrevious().getLiteral());
-        currentLocals = functionLocals;
+        LocalVarsEnvironment functionLocalVarsEnvironment = new LocalVarsEnvironment(currentLocalVars, type, (String) parser.getPrevious().getLexeme());
+        currentLocalVars = functionLocalVarsEnvironment;
 
         beginScope();
 
         consume(LEFT_PAREN, "Expect '(' after function name");
         if (!check(RIGHT_PAREN)) {
             do {
-                functionLocals.getFunction().incrementArity();
-                if (functionLocals.getFunction().getArity() > 255) {
+                functionLocalVarsEnvironment.getFunction().incrementArity();
+                if (functionLocalVarsEnvironment.getFunction().getArity() > 255) {
                     errorAt(parser.getCurrent(), "Can't have more than 255 parameters"); // Este errorAt esta bien, cambiar el resto por previous
                 }
                 byte constant = parseVariable("Expect parameter name");
@@ -277,7 +275,7 @@ public class Compiler {
     }
 
     public void returnStatement() {
-        if (currentLocals.getType() == FunctionType.SCRIPT) {
+        if (currentLocalVars.getType() == FunctionType.SCRIPT) {
             errorAt(parser.getPrevious(), "Can't return from top-level code");
         }
 
@@ -307,7 +305,7 @@ public class Compiler {
 
     public void namedVariable(Token name, boolean canAssign) {
         byte getOperation, setOperation;
-        int arg = resolveLocal(name);
+        int arg = resolveLocal(currentLocalVars, name);
 
         if (arg != -1) {
             getOperation = OpCode.GET_LOCAL;
@@ -359,7 +357,7 @@ public class Compiler {
         consume(IDENTIFIER, errorMessage);
         declareVariable();
 
-        if (currentLocals.getScopeDepth() > 0) {
+        if (currentLocalVars.getScopeDepth() > 0) {
             return (byte) 0;
         }
 
@@ -367,14 +365,14 @@ public class Compiler {
     }
 
     public void markInitialized() {
-        if (currentLocals.getScopeDepth() == 0) {
+        if (currentLocalVars.getScopeDepth() == 0) {
             return;
         }
-        currentLocals.markInitialized();
+        currentLocalVars.markInitialized();
     }
 
     public void defineVariable(byte global) {
-        if (currentLocals.getScopeDepth() > 0) {
+        if (currentLocalVars.getScopeDepth() > 0) {
             markInitialized();
             return;
         }
@@ -454,15 +452,15 @@ public class Compiler {
     // Private methods
 
     private void beginScope() {
-        currentLocals.incrementScopeDepth();
+        currentLocalVars.incrementScopeDepth();
     }
 
     private void endScope() {
-        currentLocals.decrementScopeDepth();
-        while (currentLocals.getLocalCount() > 0 &&
-                currentLocals.getAt(currentLocals.getLocalCount() - 1).getDepth() > currentLocals.getScopeDepth()) {
+        currentLocalVars.decrementScopeDepth();
+        while (currentLocalVars.getLocalCount() > 0 &&
+                currentLocalVars.getAt(currentLocalVars.getLocalCount() - 1).getDepth() > currentLocalVars.getScopeDepth()) {
             emitByte(OpCode.POP);
-            currentLocals.decrementLocalCount();
+            currentLocalVars.decrementLocalCount();
         }
     }
 
@@ -474,7 +472,7 @@ public class Compiler {
             if (parser.getCurrent().getType() != TokenType.ERROR) {
                 break;
             }
-            errorAt(parser.getCurrent(), (String) parser.getCurrent().getLiteral());
+            errorAt(parser.getCurrent(), (String) parser.getCurrent().getLexeme());
         }
     }
 
@@ -491,18 +489,18 @@ public class Compiler {
     }
 
     private byte identifierConstant(Token name) {
-        return makeConstant(name.getLiteral());
+        return makeConstant(name.getLexeme());
     }
 
     private boolean identifiersEqual(Token a, Token b) {
-        return a.getLiteral().equals(b.getLiteral()); // TODO: mejorar esto!!!!
+        return a.getLexeme().equals(b.getLexeme()); // TODO: mejorar esto!!!!
     }
 
-    private int resolveLocal(Token name) {
-        for (int i = currentLocals.getLocalCount() - 1; i >= 0; i--) {
-            Local local = currentLocals.getAt(i);
-            if (identifiersEqual(name, local.getName())) {
-                if (local.getDepth() == -1) {
+    private int resolveLocal(LocalVarsEnvironment localVarsEnvironment, Token name) {
+        for (int i = localVarsEnvironment.getLocalCount() - 1; i >= 0; i--) {
+            LocalVar localVar = localVarsEnvironment.getAt(i);
+            if (identifiersEqual(name, localVar.getName())) {
+                if (localVar.getDepth() == -1) {
                     errorAt(parser.getCurrent(), "Can't read local variable in its own initializer");
                 }
                 return i;
@@ -512,18 +510,18 @@ public class Compiler {
     }
 
     private void declareVariable() {
-        if (currentLocals.getScopeDepth() > 0) {
+        if (currentLocalVars.getScopeDepth() == 0) {
             return;
         }
 
         Token name = parser.getPrevious();
-        for (int i = currentLocals.getLocalCount() - 1; i >= 0; i--) {
-            Local local = currentLocals.getLocals()[i];
-            if (local.getDepth() != -1 && local.getDepth() < currentLocals.getScopeDepth()) {
+        for (int i = currentLocalVars.getLocalCount() - 1; i >= 0; i--) {
+            LocalVar localVar = currentLocalVars.getLocals()[i];
+            if (localVar.getDepth() != -1 && localVar.getDepth() < currentLocalVars.getScopeDepth()) {
                 break;
             }
 
-            if (identifiersEqual(name, local.getName())) {
+            if (identifiersEqual(name, localVar.getName())) {
                 errorAt(parser.getCurrent(), "Already a variable with this name in this scope");
             }
         }
@@ -532,13 +530,13 @@ public class Compiler {
     }
 
     private void addLocal(Token name) {
-        if (currentLocals.getLocalCount() >= 127) {
+        if (currentLocalVars.getLocalCount() >= 127) { // TODO: Este 127 es UINT8_COUNT
             errorAt(parser.getCurrent(), "Too many local variables in function");
             return;
         }
 
-        Local local = new Local(name, currentLocals.getScopeDepth());
-        currentLocals.addLocal(local);
+        LocalVar localVar = new LocalVar(name, currentLocalVars.getScopeDepth());
+        currentLocalVars.addLocal(localVar);
     }
 
     // Skip tokens until we reach a statement boundary (semicolon).
@@ -564,20 +562,20 @@ public class Compiler {
         emitReturn();
 
         // Extracts the current function
-        Function function = currentLocals.getFunction();
+        Function function = currentLocalVars.getFunction();
 
         if (!parser.isHadError()) {
             debugger.disassembleChunk(function.getChunk(), function.getName() != null ? function.getName() : "<script>");
         }
 
         // Restores previous locals context
-        currentLocals = currentLocals.getEnclosing();
+        currentLocalVars = currentLocalVars.getEnclosing();
 
         return function;
     }
 
     private Chunk currentChunk() {
-        return currentLocals.getFunction().getChunk();
+        return currentLocalVars.getFunction().getChunk();
     }
 
     private void errorAt(Token token, String message) {
@@ -591,7 +589,7 @@ public class Compiler {
         } else if (token.getType() == TokenType.ERROR) {
             // Just do nothing
         } else {
-            System.err.printf(" at '%s'", token.getLiteral());
+            System.err.printf(" at '%s'", token.getLexeme());
         }
         System.err.printf(": %s\n", message);
         parser.setHadError(true);

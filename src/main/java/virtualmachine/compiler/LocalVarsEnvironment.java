@@ -2,26 +2,32 @@ package virtualmachine.compiler;
 
 import virtualmachine.scanner.Token;
 
-public class Locals {
+public class LocalVarsEnvironment {
 
-    private Local[] locals;
+    private LocalVar[] localVars;
     private int localCount;
     private int scopeDepth;
 
-    private Locals enclosing;
+    // Parent environment for local variables
+    private LocalVarsEnvironment enclosing;
     private Function function;
     private FunctionType type;
 
     private static final int MAX_SIGNED_BYTE = 127;
 
-    public Locals(Locals enclosing, FunctionType type, String functionName) {
+    public LocalVarsEnvironment(LocalVarsEnvironment enclosing, FunctionType type, String functionName) {
         this.enclosing = enclosing;
         this.type = type;
 
         function = new Function(functionName);
-        locals = new Local[MAX_SIGNED_BYTE];
+        localVars = new LocalVar[MAX_SIGNED_BYTE];
         localCount = 0;
         scopeDepth = 0;
+
+        // Each local variables context is tied to a function.
+        // FunctionType.FUNCTION are user defined functions.
+        // FunctionType.SCRIPT is the main script/program.
+        // The first position in the stack is reserved for the function call
 
         Token token;
 
@@ -31,11 +37,11 @@ public class Locals {
             token = new Token(null, "", -1);
         }
 
-        locals[localCount++] = new Local(token, 0);
+        localVars[localCount++] = new LocalVar(token, 0);
     }
 
-    public Local[] getLocals() {
-        return locals;
+    public LocalVar[] getLocals() {
+        return localVars;
     }
 
     public int getLocalCount() {
@@ -70,12 +76,12 @@ public class Locals {
         this.type = type;
     }
 
-    public Locals getEnclosing() {
+    public LocalVarsEnvironment getEnclosing() {
         return enclosing;
     }
 
-    public Local getAt(int offset) {
-        return locals[offset];
+    public LocalVar getAt(int offset) {
+        return localVars[offset];
     }
 
     public void incrementScopeDepth() {
@@ -91,11 +97,11 @@ public class Locals {
     }
 
     public void markInitialized() {
-        locals[localCount - 1].setDepth(scopeDepth);
+        localVars[localCount - 1].setDepth(scopeDepth);
     }
 
-    public void addLocal(Local local) {
-        locals[localCount] = local;
+    public void addLocal(LocalVar localVar) {
+        localVars[localCount] = localVar;
         localCount++;
     }
 }

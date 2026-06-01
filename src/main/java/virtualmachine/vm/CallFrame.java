@@ -2,15 +2,16 @@ package virtualmachine.vm;
 
 import virtualmachine.compiler.Function;
 
+// Represents a single ongoing function call.
 public class CallFrame {
 
-    // Ongoing function call
+    // Ongoing function call.
     private Function function;
 
-    // Instruction pointer for returning address
-    private int returnPointer;
+    // Instruction pointer for returning address.
+    private int instructionPointer;
 
-    // Pointer to function's first slot
+    // Pointer to the first slot that this function can use.
     private int basePointer;
 
     public Function getFunction() {
@@ -21,12 +22,12 @@ public class CallFrame {
         this.function = function;
     }
 
-    public int getReturnPointer() {
-        return returnPointer;
+    public int getInstructionPointer() {
+        return instructionPointer;
     }
 
-    public void setReturnPointer(int returnPointer) {
-        this.returnPointer = returnPointer;
+    public void setInstructionPointer(int instructionPointer) {
+        this.instructionPointer = instructionPointer;
     }
 
     public int getBasePointer() {
@@ -38,6 +39,6 @@ public class CallFrame {
     }
 
     public void incrementReturnPointer() {
-        returnPointer++;
+        instructionPointer++;
     }
 }

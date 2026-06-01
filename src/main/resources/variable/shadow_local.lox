@@ -1,8 +1,8 @@
 {
-  var a = "local";
+  var a = "localVar";
   {
     var a = "shadow";
     print a; // expect: shadow
   }
-  print a; // expect: local
+  print a; // expect: localVar
 }

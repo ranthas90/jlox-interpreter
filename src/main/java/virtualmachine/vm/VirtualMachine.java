@@ -2,7 +2,6 @@ package virtualmachine.vm;
 
 import virtualmachine.compiler.Compiler;
 import virtualmachine.compiler.Function;
-import virtualmachine.compiler.FunctionType;
 import virtualmachine.compiler.OpCode;
 import virtualmachine.debug.Debugger;
 
@@ -18,7 +17,10 @@ public class VirtualMachine {
     private Map<String, Object> globals;
 
     private Debugger debugger = new Debugger();
-    private Compiler compiler = new Compiler(FunctionType.SCRIPT);
+    private Compiler compiler = new Compiler();
+
+    private static final int FRAMES_MAX = 64;
+    private static final int STACK_MAX = FRAMES_MAX * 127;
 
     public enum InterpretResult {
         INTERPRET_OK,
@@ -36,9 +38,9 @@ public class VirtualMachine {
 
     public InterpretResult interpret(String source) {
 
-        this.frames = new CallFrame[64]; // TODO: FRAMES_MAX
+        this.frames = new CallFrame[FRAMES_MAX];
         this.frameCount = 0;
-        this.valueStack = new Object[64 * 256]; // TODO: FRAMES_MAX * UINT8_COUNT
+        this.valueStack = new Object[STACK_MAX];
         this.valueStackTop = 0;
 
         Function function = compiler.compile(source);
@@ -66,10 +68,9 @@ public class VirtualMachine {
             // Print globals
             System.out.print("Globals ::           ");
             globals.forEach((key, val) -> System.out.printf("[ %s :: %s ]", key, val));
+            System.out.println();
 
-            System.out.println("Current IP: " + frame.getReturnPointer());
-
-            debugger.disassembleInstruction(frame.getFunction().getChunk(), frame.getReturnPointer());
+            debugger.disassembleInstruction(frame.getFunction().getChunk(), frame.getInstructionPointer());
             System.out.println();
             byte instruction;
             switch (instruction = readByte(frame)) {
@@ -191,17 +192,17 @@ public class VirtualMachine {
                 }
                 case OpCode.JUMP -> {
                     short offset = readShort(frame);
-                    frame.setReturnPointer(frame.getReturnPointer() + offset);
+                    frame.setInstructionPointer(frame.getInstructionPointer() + offset);
                 }
                 case OpCode.JUMP_IF_FALSE -> {
                     short offset = readShort(frame);
                     if (isFalsey(peekValue(0))) {
-                        frame.setReturnPointer(frame.getReturnPointer() + offset);
+                        frame.setInstructionPointer(frame.getInstructionPointer() + offset);
                     }
                 }
                 case OpCode.LOOP -> {
                     short offset = readShort(frame);
-                    frame.setReturnPointer(frame.getReturnPointer() - offset);
+                    frame.setInstructionPointer(frame.getInstructionPointer() - offset);
                 }
                 case OpCode.CALL -> {
                     int argCount = readByte(frame);
@@ -271,7 +272,7 @@ public class VirtualMachine {
 
         CallFrame frame = new CallFrame();
         frame.setFunction(function);
-        frame.setReturnPointer(0);
+        frame.setInstructionPointer(0);
         frame.setBasePointer(valueStackTop - 1 - argCount);
 
         pushFrame(frame);
@@ -303,7 +304,7 @@ public class VirtualMachine {
         for (int i = frameCount - 1; i >= 0; i--) {
             CallFrame frame = frames[i];
             Function function = frame.getFunction();
-            byte instr = function.getChunk().getCodeAt(frame.getReturnPointer()); // TODO: revisar con programa erroneo del libro!!!
+            byte instr = function.getChunk().getCodeAt(frame.getInstructionPointer()); // TODO: revisar con programa erroneo del libro!!!
             System.err.printf("[line %d] in ", frame.getFunction().getChunk().getLineAt(instr));
             if (function.getName() == null) {
                 System.err.println("script");
@@ -318,7 +319,7 @@ public class VirtualMachine {
     }
 
     private byte readByte(CallFrame frame) {
-        byte byteRead = frame.getFunction().getChunk().getCodeAt(frame.getReturnPointer());
+        byte byteRead = frame.getFunction().getChunk().getCodeAt(frame.getInstructionPointer());
         frame.incrementReturnPointer();
         return byteRead;
     }
@@ -329,9 +330,9 @@ public class VirtualMachine {
     }
 
     private short readShort(CallFrame frame) {
-        int high = frame.getFunction().getChunk().getCodeAt(frame.getReturnPointer());
+        int high = frame.getFunction().getChunk().getCodeAt(frame.getInstructionPointer());
         frame.incrementReturnPointer();
-        int low = frame.getFunction().getChunk().getCodeAt(frame.getReturnPointer());
+        int low = frame.getFunction().getChunk().getCodeAt(frame.getInstructionPointer());
         frame.incrementReturnPointer();
         return (short) (((high & 0xFF) << 8) | (low & 0xFF));
     }

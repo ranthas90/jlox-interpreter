@@ -3,16 +3,16 @@ package virtualmachine.scanner;
 public class Token {
 
     private final TokenType type;
-    private final Object literal;
+    private final Object lexeme;
     private final int line;
 
     public Token(TokenType type) {
         this(type, null, -1);
     }
 
-    public Token(TokenType type, Object literal, int line) {
+    public Token(TokenType type, Object lexeme, int line) {
         this.type = type;
-        this.literal = literal;
+        this.lexeme = lexeme;
         this.line = line;
     }
 
@@ -20,8 +20,8 @@ public class Token {
         return type;
     }
 
-    public Object getLiteral() {
-        return literal;
+    public Object getLexeme() {
+        return lexeme;
     }
 
     public int getLine() {
@@ -32,7 +32,7 @@ public class Token {
     public String toString() {
         return "Token{" +
                 "type=" + type +
-                ", literal=" + literal +
+                ", literal=" + lexeme +
                 ", line=" + line +
                 '}';
     }
