@@ -64,6 +64,7 @@ public class Debugger {
 
                 yield offset;
             }
+            case OpCode.CLOSE_UPVALUE -> simpleInstruction("OP_CLOSE_UPVALUE", offset);
             case OpCode.RETURN -> simpleInstruction("OP_RETURN", offset);
             default -> {
                 System.out.printf("Unknown opcode %d\n", instruction);

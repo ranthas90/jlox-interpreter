@@ -39,7 +39,7 @@ public class LocalVarsEnvironment {
             token = new Token(null, "", -1);
         }
 
-        localVars[localCount++] = new LocalVar(token, 0);
+        localVars[localCount++] = new LocalVar(token, 0, false);
     }
 
     public LocalVar[] getLocals() {

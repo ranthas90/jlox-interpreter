@@ -21,7 +21,6 @@ public class Lox {
             runFile(args[0]);
         } else {
             repl();
-            //runFile("./src/main/resources/if/else.lox");
         }
     }
 

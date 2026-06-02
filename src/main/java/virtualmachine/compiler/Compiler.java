@@ -467,7 +467,11 @@ public class Compiler {
         currentLocals.decrementScopeDepth();
         while (currentLocals.getLocalCount() > 0 &&
                 currentLocals.getAt(currentLocals.getLocalCount() - 1).getDepth() > currentLocals.getScopeDepth()) {
-            emitByte(OpCode.POP);
+            if (currentLocals.getLocals()[currentLocals.getLocalCount() - 1].isCaptured()) {
+                emitByte(OpCode.CLOSE_UPVALUE);
+            } else {
+                emitByte(OpCode.POP);
+            }
             currentLocals.decrementLocalCount();
         }
     }
@@ -542,6 +546,7 @@ public class Compiler {
 
         int local = resolveLocal(localVarsEnvironment.getEnclosing(), name);
         if (local != -1) {
+            localVarsEnvironment.getEnclosing().getLocals()[local].setCaptured(true);
             return addUpvalue(localVarsEnvironment, (byte) local, true);
         }
 
@@ -579,7 +584,7 @@ public class Compiler {
             return;
         }
 
-        LocalVar localVar = new LocalVar(name, currentLocals.getScopeDepth());
+        LocalVar localVar = new LocalVar(name, currentLocals.getScopeDepth(), false);
         currentLocals.addLocal(localVar);
     }
 

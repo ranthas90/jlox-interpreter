@@ -14,6 +14,7 @@ public class VirtualMachine {
     private int frameCount;
     private Object[] valueStack;
     private int valueStackTop;
+    private Upvalue openUpvalues; // Linked list, tiene un atributo de su mismo tipo que apunta al siguiente elemento de la lista
     private Map<String, Object> globals;
 
     private Debugger debugger = new Debugger();
@@ -64,6 +65,7 @@ public class VirtualMachine {
         System.out.println("=== Running interpreter ===");
         while (true) {
             // Print stack
+            /*
             System.out.print("Stack   ::           ");
             for (int i = 0; i < valueStackTop; i++) {
                 System.out.printf("[ %s ]", valueStack[i]);
@@ -77,6 +79,7 @@ public class VirtualMachine {
 
             debugger.disassembleInstruction(frame.getClosure().getFunction().getChunk(), frame.getInstructionPointer());
             System.out.println();
+             */
             byte instruction;
             switch (instruction = readByte(frame)) {
                 case OpCode.CONSTANT -> pushValue(readConstant(frame));
@@ -117,11 +120,16 @@ public class VirtualMachine {
                 }
                 case OpCode.GET_UPVALUE ->{
                     byte slot = readByte(frame);
-                    int valueStackIndex = frame.getClosure().getUpvalues()[slot].getLocation();
-                    pushValue(valueStack[valueStackIndex]);
+                    Upvalue upvalue = frame.getClosure().getUpvalues()[slot];
+                    if (upvalue.getLocation() == -1) {
+                        pushValue(upvalue.getClosedValue());
+                    } else {
+                        pushValue(valueStack[upvalue.getLocation()]);
+                    }
                 }
                 case OpCode.SET_UPVALUE -> {
                     byte slot = readByte(frame);
+                    // TODO: revisar, hay que implementar la misma solucion que con GET_UPVALUE para localizar valores cerrados
                     int valueStackIndex = frame.getClosure().getUpvalues()[slot].getLocation();
                     valueStack[valueStackIndex] = peekValue(0);
                 }
@@ -240,8 +248,13 @@ public class VirtualMachine {
                         }
                     }
                 }
+                case OpCode.CLOSE_UPVALUE -> {
+                    closeUpvalues(valueStackTop - 1);
+                    popValue();
+                }
                 case OpCode.RETURN -> {
                     Object result = popValue();
+                    closeUpvalues(frame.getBasePointer());
                     frameCount--;
                     if (frameCount == 0) {
                         popValue();
@@ -324,8 +337,37 @@ public class VirtualMachine {
     }
 
     private Upvalue captureUpvalue(int location) {
+        Upvalue previousUpvalue = null;
+        Upvalue upvalue = openUpvalues;
+        while (upvalue != null && upvalue.getLocation() > location) {
+            previousUpvalue = upvalue;
+            upvalue = upvalue.getNext();
+        }
+
+        if (upvalue != null && upvalue.getLocation() == location) {
+            return upvalue;
+        }
+
         Upvalue createdUpvalue = new Upvalue(location);
+        createdUpvalue.setNext(upvalue);
+
+        if (previousUpvalue == null) {
+            openUpvalues = createdUpvalue;
+        } else {
+            previousUpvalue.setNext(createdUpvalue);
+        }
+
         return createdUpvalue;
+    }
+
+    private void closeUpvalues(int last) {
+        while(openUpvalues != null && openUpvalues.getLocation() >= last) {
+            Upvalue upvalue = openUpvalues;
+            upvalue.setClosedValue(valueStack[upvalue.getLocation()]);
+            upvalue.setLocation(-1);
+            openUpvalues = upvalue.getNext();
+            upvalue.setNext(null);
+        }
     }
 
     private void resetValueStack() {

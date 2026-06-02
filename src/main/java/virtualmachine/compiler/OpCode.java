@@ -28,5 +28,6 @@ public class OpCode {
     public static final byte LOOP =             0x18;
     public static final byte CALL =             0x19;
     public static final byte CLOSURE =          0x20;
-    public static final byte RETURN =           0x21;
+    public static final byte CLOSE_UPVALUE =    0x21;
+    public static final byte RETURN =           0x22;
 }
