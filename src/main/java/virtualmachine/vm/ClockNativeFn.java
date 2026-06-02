@@ -4,7 +4,7 @@ public class ClockNativeFn implements NativeFn {
 
     @Override
     public Object call(Object... params) {
-        return System.currentTimeMillis();
+        return Double.parseDouble(Long.toString(System.currentTimeMillis()));
     }
 
     @Override
