@@ -1,6 +1,7 @@
 package virtualmachine.debug;
 
 import virtualmachine.compiler.Chunk;
+import virtualmachine.compiler.Function;
 import virtualmachine.compiler.OpCode;
 
 public class Debugger {
@@ -32,6 +33,8 @@ public class Debugger {
             case OpCode.GET_GLOBAL -> constantInstruction("OP_GET_GLOBAL", chunk, offset);
             case OpCode.DEFINE_GLOBAL -> constantInstruction("OP_DEFINE_GLOBAL", chunk, offset);
             case OpCode.SET_GLOBAL -> constantInstruction("OP_SET_GLOBAL", chunk, offset);
+            case OpCode.GET_UPVALUE -> byteInstruction("OP_GET_UPVALUE", chunk, offset);
+            case OpCode.SET_UPVALUE -> byteInstruction("OP_SET_UPVALUE", chunk, offset);
             case OpCode.EQUAL -> simpleInstruction("OP_EQUAL", offset);
             case OpCode.GREATER -> simpleInstruction("OP_GREATER", offset);
             case OpCode.LESS -> simpleInstruction("OP_LESS", offset);
@@ -46,6 +49,21 @@ public class Debugger {
             case OpCode.JUMP_IF_FALSE -> jumpInstruction("OP_JUMP_IF_FALSE", 1, chunk, offset);
             case OpCode.LOOP -> jumpInstruction("OP_LOOP", -1, chunk, offset);
             case OpCode.CALL -> byteInstruction("OP_CALL", chunk, offset);
+            case OpCode.CLOSURE -> {
+                offset++;
+                byte constantIndex = chunk.getCodeAt(offset++);
+                System.out.printf("%-16s %4d ", "OP_CLOSURE", constantIndex);
+                System.out.printf("%s\n", chunk.getConstantAt(constantIndex));
+
+                Function function = (Function) chunk.getConstantAt(constantIndex);
+                for (int j = 0; j < function.getUpvalueCount(); j++) {
+                    int isLocal = chunk.getCodeAt(offset++);
+                    int index = chunk.getCodeAt(offset++);
+                    System.out.printf("%04d      |                     %s %d\n", offset - 2, isLocal == 1 ? "local" : "upvalue", index);
+                }
+
+                yield offset;
+            }
             case OpCode.RETURN -> simpleInstruction("OP_RETURN", offset);
             default -> {
                 System.out.printf("Unknown opcode %d\n", instruction);

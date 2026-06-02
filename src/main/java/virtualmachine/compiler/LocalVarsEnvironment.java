@@ -6,6 +6,7 @@ public class LocalVarsEnvironment {
 
     private LocalVar[] localVars;
     private int localCount;
+    private Upvalue[] upvalues;
     private int scopeDepth;
 
     // Parent environment for local variables
@@ -22,6 +23,7 @@ public class LocalVarsEnvironment {
         function = new Function(functionName);
         localVars = new LocalVar[MAX_SIGNED_BYTE];
         localCount = 0;
+        upvalues = new Upvalue[MAX_SIGNED_BYTE];
         scopeDepth = 0;
 
         // Each local variables context is tied to a function.
@@ -103,5 +105,18 @@ public class LocalVarsEnvironment {
     public void addLocal(LocalVar localVar) {
         localVars[localCount] = localVar;
         localCount++;
+    }
+
+    public Upvalue getUpvalueAt(int index) {
+        return upvalues[index];
+    }
+
+    public int addUpvalue(Upvalue upvalue) {
+        int upvalueCount = function.getUpvalueCount();
+        upvalues[upvalueCount] = upvalue;
+
+        function.incrementUpvalueCount();
+
+        return upvalueCount;
     }
 }

@@ -185,7 +185,12 @@ public class Compiler {
         block();
 
         Function function = endCompiler();
-        emitBytes(OpCode.CONSTANT, makeConstant(function));
+        emitBytes(OpCode.CLOSURE, makeConstant(function));
+
+        for (int i = 0; i < function.getUpvalueCount(); i++) {
+            emitByte(functionLocals.getUpvalueAt(i).isLocal() ? (byte) 1 : (byte) 0);
+            emitByte(functionLocals.getUpvalueAt(i).getIndex());
+        }
     }
 
     public void funDeclaration() {
@@ -310,6 +315,9 @@ public class Compiler {
         if (arg != -1) {
             getOperation = OpCode.GET_LOCAL;
             setOperation = OpCode.SET_LOCAL;
+        } else if ((arg = resolveUpvalue(currentLocals, name)) != -1) {
+            getOperation = OpCode.GET_UPVALUE;
+            setOperation = OpCode.SET_UPVALUE;
         } else {
             arg = identifierConstant(name);
             getOperation = OpCode.GET_GLOBAL;
@@ -506,6 +514,42 @@ public class Compiler {
                 return i;
             }
         }
+        return -1;
+    }
+
+    private int addUpvalue(LocalVarsEnvironment localVarsEnvironment, byte index, boolean isLocal) {
+        int upvalueCount = localVarsEnvironment.getFunction().getUpvalueCount();
+
+        for (int i = 0; i < upvalueCount; i++) {
+            Upvalue upvalue = localVarsEnvironment.getUpvalueAt(i);
+            if (upvalue.getIndex() == index && upvalue.isLocal() == isLocal) {
+                return i;
+            }
+        }
+
+        if (upvalueCount == 127) { // TODO: UINT8_COUNT
+            errorAt(parser.getPrevious(), "Too many closure variables in function");
+            return 0;
+        }
+
+        return localVarsEnvironment.addUpvalue(new Upvalue(index, isLocal));
+    }
+
+    private int resolveUpvalue(LocalVarsEnvironment localVarsEnvironment, Token name) {
+        if (localVarsEnvironment.getEnclosing() == null) {
+            return -1;
+        }
+
+        int local = resolveLocal(localVarsEnvironment.getEnclosing(), name);
+        if (local != -1) {
+            return addUpvalue(localVarsEnvironment, (byte) local, true);
+        }
+
+        int upvalue = resolveUpvalue(localVarsEnvironment.getEnclosing(), name);
+        if (upvalue != -1) {
+            return addUpvalue(localVarsEnvironment, (byte) upvalue, false);
+        }
+
         return -1;
     }
 

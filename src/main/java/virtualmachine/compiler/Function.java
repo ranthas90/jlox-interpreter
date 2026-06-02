@@ -4,17 +4,23 @@ public class Function {
 
     //private Object object;
     private int arity;
+    private int upvalueCount;
     private Chunk chunk;
     private String name;
 
     public Function(String name) {
         arity = 0;
+        upvalueCount = 0;
         this.name = name;
         chunk = new Chunk();
     }
 
     public int getArity() {
         return arity;
+    }
+
+    public int getUpvalueCount() {
+        return upvalueCount;
     }
 
     public Chunk getChunk() {
@@ -31,6 +37,10 @@ public class Function {
 
     public void incrementArity() {
         arity++;
+    }
+
+    public void incrementUpvalueCount() {
+        upvalueCount++;
     }
 
     @Override

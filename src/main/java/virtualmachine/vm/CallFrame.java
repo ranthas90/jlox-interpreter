@@ -1,12 +1,10 @@
 package virtualmachine.vm;
 
-import virtualmachine.compiler.Function;
-
 // Represents a single ongoing function call.
 public class CallFrame {
 
     // Ongoing function call.
-    private Function function;
+    private Closure closure;
 
     // Instruction pointer for returning address.
     private int instructionPointer;
@@ -14,12 +12,12 @@ public class CallFrame {
     // Pointer to the first slot that this function can use.
     private int basePointer;
 
-    public Function getFunction() {
-        return function;
+    public Closure getClosure() {
+        return closure;
     }
 
-    public void setFunction(Function function) {
-        this.function = function;
+    public void setClosure(Closure closure) {
+        this.closure = closure;
     }
 
     public int getInstructionPointer() {

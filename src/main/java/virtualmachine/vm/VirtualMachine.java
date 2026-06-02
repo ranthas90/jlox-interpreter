@@ -49,7 +49,12 @@ public class VirtualMachine {
         }
 
         pushValue(function);
-        call(function, 0);
+        //call(function, 0);
+        Closure closure = new Closure(function);
+        popValue();
+        Object value = closure;
+        pushValue(value);
+        call(closure, 0);
 
         return run();
     }
@@ -70,7 +75,7 @@ public class VirtualMachine {
             globals.forEach((key, val) -> System.out.printf("[ %s :: %s ]", key, val));
             System.out.println();
 
-            debugger.disassembleInstruction(frame.getFunction().getChunk(), frame.getInstructionPointer());
+            debugger.disassembleInstruction(frame.getClosure().getFunction().getChunk(), frame.getInstructionPointer());
             System.out.println();
             byte instruction;
             switch (instruction = readByte(frame)) {
@@ -109,6 +114,16 @@ public class VirtualMachine {
                         return InterpretResult.INTERPRET_RUNTIME_ERROR;
                     }
                     globals.put((String) constant, peekValue(0));
+                }
+                case OpCode.GET_UPVALUE ->{
+                    byte slot = readByte(frame);
+                    int valueStackIndex = frame.getClosure().getUpvalues()[slot].getLocation();
+                    pushValue(valueStack[valueStackIndex]);
+                }
+                case OpCode.SET_UPVALUE -> {
+                    byte slot = readByte(frame);
+                    int valueStackIndex = frame.getClosure().getUpvalues()[slot].getLocation();
+                    valueStack[valueStackIndex] = peekValue(0);
                 }
                 case OpCode.EQUAL -> {
                     Object a = popValue();
@@ -211,6 +226,20 @@ public class VirtualMachine {
                     }
                     frame = frames[frameCount - 1];
                 }
+                case OpCode.CLOSURE -> {
+                    Object function = readConstant(frame);
+                    Closure closure = new Closure((Function) function);
+                    pushValue(closure);
+                    for (int i = 0; i < closure.getUpvaluesCount(); i++) {
+                        byte isLocal = readByte(frame);
+                        byte index = readByte(frame);
+                        if (isLocal == 1) {
+                            closure.getUpvalues()[i] = captureUpvalue(frame.getBasePointer() + index);
+                        } else {
+                            closure.getUpvalues()[i] = frame.getClosure().getUpvalues()[index];
+                        }
+                    }
+                }
                 case OpCode.RETURN -> {
                     Object result = popValue();
                     frameCount--;
@@ -259,9 +288,9 @@ public class VirtualMachine {
         globals.put(name, nativeFn);
     }
 
-    private boolean call(Function function, int argCount) {
-        if (argCount != function.getArity()) {
-            runtimeError(String.format("Expected %d arguments but got %d", function.getArity(), argCount));
+    private boolean call(Closure closure, int argCount) {
+        if (argCount != closure.getFunction().getArity()) {
+            runtimeError(String.format("Expected %d arguments but got %d", closure.getFunction().getArity(), argCount));
             return false;
         }
 
@@ -271,8 +300,8 @@ public class VirtualMachine {
         }
 
         CallFrame frame = new CallFrame();
-        frame.setFunction(function);
-        frame.setInstructionPointer(0);
+        frame.setClosure(closure);
+        frame.setInstructionPointer(0); // TODO: esto sigue sin convencerme!
         frame.setBasePointer(valueStackTop - 1 - argCount);
 
         pushFrame(frame);
@@ -280,8 +309,8 @@ public class VirtualMachine {
     }
 
     private boolean callValue(Object callee, int argCount) {
-        if (callee instanceof Function) {
-            return call((Function) callee, argCount);
+        if (callee instanceof Closure) {
+            return call((Closure) callee, argCount);
         } else if (callee instanceof NativeFn) {
             NativeFn nativeFn = (NativeFn) callee;
             // TODO: los parametros los sacamos contando hacia atras desde stackTop un total de argCount veces,
@@ -294,6 +323,11 @@ public class VirtualMachine {
         return false;
     }
 
+    private Upvalue captureUpvalue(int location) {
+        Upvalue createdUpvalue = new Upvalue(location);
+        return createdUpvalue;
+    }
+
     private void resetValueStack() {
         valueStack = new Object[256];
         valueStackTop = 0;
@@ -303,9 +337,9 @@ public class VirtualMachine {
         System.err.println(message);
         for (int i = frameCount - 1; i >= 0; i--) {
             CallFrame frame = frames[i];
-            Function function = frame.getFunction();
+            Function function = frame.getClosure().getFunction();
             byte instr = function.getChunk().getCodeAt(frame.getInstructionPointer()); // TODO: revisar con programa erroneo del libro!!!
-            System.err.printf("[line %d] in ", frame.getFunction().getChunk().getLineAt(instr));
+            System.err.printf("[line %d] in ", frame.getClosure().getFunction().getChunk().getLineAt(instr));
             if (function.getName() == null) {
                 System.err.println("script");
             } else {
@@ -319,20 +353,20 @@ public class VirtualMachine {
     }
 
     private byte readByte(CallFrame frame) {
-        byte byteRead = frame.getFunction().getChunk().getCodeAt(frame.getInstructionPointer());
+        byte byteRead = frame.getClosure().getFunction().getChunk().getCodeAt(frame.getInstructionPointer());
         frame.incrementReturnPointer();
         return byteRead;
     }
 
     private Object readConstant(CallFrame frame) {
         byte byteRead = readByte(frame);
-        return frame.getFunction().getChunk().getConstantAt(byteRead);
+        return frame.getClosure().getFunction().getChunk().getConstantAt(byteRead);
     }
 
     private short readShort(CallFrame frame) {
-        int high = frame.getFunction().getChunk().getCodeAt(frame.getInstructionPointer());
+        int high = frame.getClosure().getFunction().getChunk().getCodeAt(frame.getInstructionPointer());
         frame.incrementReturnPointer();
-        int low = frame.getFunction().getChunk().getCodeAt(frame.getInstructionPointer());
+        int low = frame.getClosure().getFunction().getChunk().getCodeAt(frame.getInstructionPointer());
         frame.incrementReturnPointer();
         return (short) (((high & 0xFF) << 8) | (low & 0xFF));
     }
