@@ -1,8 +1,7 @@
 package virtualmachine.vm;
 
+import virtualmachine.compiler.*;
 import virtualmachine.compiler.Compiler;
-import virtualmachine.compiler.Function;
-import virtualmachine.compiler.OpCode;
 import virtualmachine.debug.Debugger;
 
 import java.util.HashMap;
@@ -132,6 +131,42 @@ public class VirtualMachine {
                     // TODO: revisar, hay que implementar la misma solucion que con GET_UPVALUE para localizar valores cerrados
                     int valueStackIndex = frame.getClosure().getUpvalues()[slot].getLocation();
                     valueStack[valueStackIndex] = peekValue(0);
+                }
+                case OpCode.GET_PROPERTY -> {
+                    if (!(peekValue(0) instanceof ObjInstance)) {
+                        runtimeError("Only instances have properties");
+                        return InterpretResult.INTERPRET_RUNTIME_ERROR;
+                    }
+
+                    ObjInstance instance = (ObjInstance) peekValue(0);
+                    String name = readString(frame);
+                    Object instanceFieldValue = instance.getFieldByName(name);
+                    if (instanceFieldValue != null) {
+                        popValue(); // Pops instance from stack
+                        pushValue(instanceFieldValue); // Pushes instance field value
+                        break;
+                    }
+                    runtimeError(String.format("Undefined property '%s'", name));
+                    return InterpretResult.INTERPRET_RUNTIME_ERROR;
+                }
+                case OpCode.SET_PROPERTY -> {
+                    // Cuando se ejecuta el SET_PROPERTY, en la cima de la pila tiene la instancia cuyo campo está
+                    // siendo setteado, y por encima de este registro, el valor que se va a settear.
+                    // Por eso, primero popeamos el valor, luego la instancia y finalmente volvemos a pushear el valor
+                    // a la cima de la pila. Lo que hemos hecho, realmente, es eliminar el 2º valor de la pila.
+
+                    // Otra nota: no hace falta declarar los atributos de la clase. Si se intenta settear un atributo
+                    // que no existe, se crea.
+                    if (!(peekValue(1) instanceof ObjInstance)) {
+                        runtimeError("Only instances have fields");
+                        return InterpretResult.INTERPRET_RUNTIME_ERROR;
+                    }
+
+                    ObjInstance instance = (ObjInstance) peekValue(1);
+                    instance.addValueToField(readString(frame), peekValue(0));
+                    Object value = popValue();
+                    popValue();
+                    pushValue(value);
                 }
                 case OpCode.EQUAL -> {
                     Object a = popValue();
@@ -265,6 +300,7 @@ public class VirtualMachine {
                     pushValue(result);
                     frame = frames[frameCount - 1];
                 }
+                case OpCode.CLASS -> pushValue(new ObjClass(readString(frame)));
             }
         }
     }
@@ -322,7 +358,11 @@ public class VirtualMachine {
     }
 
     private boolean callValue(Object callee, int argCount) {
-        if (callee instanceof Closure) {
+        if (callee instanceof ObjClass) {
+            ObjInstance instance = new ObjInstance((ObjClass) callee);
+            valueStack[valueStackTop - 1 - argCount] = instance;
+            return true;
+        } else if (callee instanceof Closure) {
             return call((Closure) callee, argCount);
         } else if (callee instanceof NativeFn) {
             NativeFn nativeFn = (NativeFn) callee;
@@ -411,5 +451,9 @@ public class VirtualMachine {
         int low = frame.getClosure().getFunction().getChunk().getCodeAt(frame.getInstructionPointer());
         frame.incrementReturnPointer();
         return (short) (((high & 0xFF) << 8) | (low & 0xFF));
+    }
+
+    private String readString(CallFrame frame) {
+        return (String) readConstant(frame);
     }
 }

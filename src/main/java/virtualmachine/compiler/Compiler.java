@@ -37,7 +37,7 @@ public class Compiler {
         addRule(LEFT_BRACE,     null,                   null,                   NONE);
         addRule(RIGHT_BRACE,    null,                   null,                   NONE);
         addRule(COMMA,          null,                   null,                   NONE);
-        addRule(DOT,            null,                   null,                   NONE);
+        addRule(DOT,            null,                   new DotParseFn(),       CALL);
         addRule(MINUS,          new UnaryParseFn(),     new BinaryParseFn(),    TERM);
         addRule(PLUS,           null,                   new BinaryParseFn(),    TERM);
         addRule(SEMICOLON,      null,                   null,                   NONE);
@@ -106,7 +106,9 @@ public class Compiler {
     }
 
     public void declaration() {
-        if (match(FUN)) {
+        if (match(CLASS)) {
+            classDeclaration();
+        } else if (match(FUN)) {
             funDeclaration();
         }else if (match(VAR)) {
             varDeclaration();
@@ -191,6 +193,18 @@ public class Compiler {
             emitByte(functionLocals.getUpvalueAt(i).isLocal() ? (byte) 1 : (byte) 0);
             emitByte(functionLocals.getUpvalueAt(i).getIndex());
         }
+    }
+
+    public void classDeclaration() {
+        consume(IDENTIFIER, "Expect class name");
+        byte nameConstant = identifierConstant(parser.getPrevious());
+        declareVariable();
+
+        emitBytes(OpCode.CLASS, nameConstant);
+        defineVariable(nameConstant);
+
+        consume(LEFT_BRACE, "Expect '{' before class body");
+        consume(RIGHT_BRACE, "Expect '}' after class body");
     }
 
     public void funDeclaration() {
@@ -488,7 +502,7 @@ public class Compiler {
         }
     }
 
-    private boolean match(TokenType type) {
+    public boolean match(TokenType type) {
         if (!check(type)) {
             return false;
         }
@@ -500,7 +514,7 @@ public class Compiler {
         return parser.getCurrent().getType() == type;
     }
 
-    private byte identifierConstant(Token name) {
+    public byte identifierConstant(Token name) {
         return makeConstant(name.getLexeme());
     }
 
