@@ -67,7 +67,7 @@ public class Compiler {
         addRule(TOKEN_OR, null, null, NONE);
         addRule(PRINT, null, null, NONE);
         addRule(RETURN, null, null, NONE);
-        addRule(SUPER, null, null, NONE);
+        addRule(SUPER, new SuperParseFn(), null, NONE);
         addRule(THIS, new ThisParseFn(), null, NONE);
         addRule(TRUE, new LiteralParseFn(), null, NONE);
         addRule(VAR, null, null, NONE);
@@ -226,6 +226,23 @@ public class Compiler {
 
         currentClass = new ClassCompiler(currentClass);
 
+        if (match(LESS)) {
+            consume(IDENTIFIER, "Expect superclass name");
+            new VariableParserFn().parse(this, false);
+
+            if (identifiersEqual(className, parser.getPrevious())) {
+                errorAt(parser.getPrevious(), "A class can't inherit from itself");
+            }
+
+            beginScope();
+            addLocal(new Token(null, "super", -1));
+            defineVariable((byte)0);
+
+            namedVariable(className, false);
+            emitByte(OpCode.INHERIT);
+            currentClass.setHasSuperclass(true);
+        }
+
         namedVariable(className, false);
         consume(LEFT_BRACE, "Expect '{' before class body");
         while (!check(RIGHT_BRACE) && !check(EOF)) {
@@ -233,6 +250,10 @@ public class Compiler {
         }
         consume(RIGHT_BRACE, "Expect '}' after class body");
         emitByte(OpCode.POP);
+
+        if (currentClass.isHasSuperclass()) {
+            endScope();
+        }
 
         currentClass = currentClass.getEnclosing();
     }

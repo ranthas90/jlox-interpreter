@@ -19,6 +19,10 @@ public class ObjClass {
         return name;
     }
 
+    public Map<String, Closure> getMethods() {
+        return methods;
+    }
+
     public void addMethod(String name, Closure method) {
         methods.put(name, method);
     }

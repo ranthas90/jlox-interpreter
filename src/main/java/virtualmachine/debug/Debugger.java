@@ -37,6 +37,7 @@ public class Debugger {
             case OpCode.SET_UPVALUE -> byteInstruction("OP_SET_UPVALUE", chunk, offset);
             case OpCode.GET_PROPERTY -> constantInstruction("OP_GET_PROPERTY", chunk, offset);
             case OpCode.SET_PROPERTY -> constantInstruction("OP_SET_PROPERTY", chunk, offset);
+            case OpCode.GET_SUPER -> constantInstruction("OP_GET_SUPER", chunk, offset);
             case OpCode.EQUAL -> simpleInstruction("OP_EQUAL", offset);
             case OpCode.GREATER -> simpleInstruction("OP_GREATER", offset);
             case OpCode.LESS -> simpleInstruction("OP_LESS", offset);
@@ -52,6 +53,7 @@ public class Debugger {
             case OpCode.LOOP -> jumpInstruction("OP_LOOP", -1, chunk, offset);
             case OpCode.CALL -> byteInstruction("OP_CALL", chunk, offset);
             case OpCode.INVOKE -> invokeInstruction("OP_INVOKE", chunk, offset);
+            case OpCode.SUPER_INVOKE -> invokeInstruction("OP_SUPER_INVOKE", chunk, offset);
             case OpCode.CLOSURE -> {
                 offset++;
                 byte constantIndex = chunk.getCodeAt(offset++);
@@ -70,6 +72,7 @@ public class Debugger {
             case OpCode.CLOSE_UPVALUE -> simpleInstruction("OP_CLOSE_UPVALUE", offset);
             case OpCode.RETURN -> simpleInstruction("OP_RETURN", offset);
             case OpCode.CLASS -> constantInstruction("OP_CLASS", chunk, offset);
+            case OpCode.INHERIT -> simpleInstruction("OP_INHERIT", offset);
             case OpCode.METHOD -> constantInstruction("OP_METHOD", chunk, offset);
             default -> {
                 System.out.printf("Unknown opcode %d\n", instruction);

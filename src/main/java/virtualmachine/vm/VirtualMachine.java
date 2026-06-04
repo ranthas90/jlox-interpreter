@@ -155,6 +155,14 @@ public class VirtualMachine {
                     popValue();
                     pushValue(value);
                 }
+                case OpCode.GET_SUPER -> {
+                    String name = readString(frame);
+                    ObjClass superclass = (ObjClass) popValue();
+
+                    if (!bindMethod(superclass, name)) {
+                        return InterpretResult.INTERPRET_RUNTIME_ERROR;
+                    }
+                }
                 case OpCode.EQUAL -> {
                     Object a = popValue();
                     Object b = popValue();
@@ -264,6 +272,15 @@ public class VirtualMachine {
                     }
                     frame = frames[frameCount - 1];
                 }
+                case OpCode.SUPER_INVOKE -> {
+                    String method = readString(frame);
+                    int argCount = readByte(frame);
+                    ObjClass superclass = (ObjClass) popValue();
+                    if (!(invokeFromClass(superclass, method, argCount))) {
+                        return InterpretResult.INTERPRET_RUNTIME_ERROR;
+                    }
+                    frame = frames[frameCount - 1];
+                }
                 case OpCode.CLOSURE -> {
                     Object function = readConstant(frame);
                     Closure closure = new Closure((Function) function);
@@ -296,6 +313,17 @@ public class VirtualMachine {
                     frame = frames[frameCount - 1];
                 }
                 case OpCode.CLASS -> pushValue(new ObjClass(readString(frame)));
+                case OpCode.INHERIT -> {
+                    Object superclass = peekValue(1);
+                    if (!(superclass instanceof ObjClass)) {
+                        runtimeError("Superclass must be a class");
+                        return InterpretResult.INTERPRET_RUNTIME_ERROR;
+                    }
+
+                    ObjClass subclass = (ObjClass) peekValue(0);
+                    ((ObjClass) superclass).getMethods().putAll(subclass.getMethods());
+                    popValue(); // Pops subclass
+                }
                 case OpCode.METHOD -> defineMethod(readString(frame));
             }
         }
