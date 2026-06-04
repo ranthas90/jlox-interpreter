@@ -29,8 +29,10 @@ public class OpCode {
     public static final byte JUMP_IF_FALSE =    0x19;
     public static final byte LOOP =             0x1A;
     public static final byte CALL =             0x1B;
-    public static final byte CLOSURE =          0x1C;
-    public static final byte CLOSE_UPVALUE =    0x1D;
-    public static final byte RETURN =           0x1E;
-    public static final byte CLASS =            0x1F;
+    public static final byte INVOKE =           0x1C;
+    public static final byte CLOSURE =          0x1D;
+    public static final byte CLOSE_UPVALUE =    0x1E;
+    public static final byte RETURN =           0x1F;
+    public static final byte CLASS =            0x20;
+    public static final byte METHOD =           0x21;
 }

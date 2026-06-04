@@ -51,6 +51,7 @@ public class Debugger {
             case OpCode.JUMP_IF_FALSE -> jumpInstruction("OP_JUMP_IF_FALSE", 1, chunk, offset);
             case OpCode.LOOP -> jumpInstruction("OP_LOOP", -1, chunk, offset);
             case OpCode.CALL -> byteInstruction("OP_CALL", chunk, offset);
+            case OpCode.INVOKE -> invokeInstruction("OP_INVOKE", chunk, offset);
             case OpCode.CLOSURE -> {
                 offset++;
                 byte constantIndex = chunk.getCodeAt(offset++);
@@ -69,6 +70,7 @@ public class Debugger {
             case OpCode.CLOSE_UPVALUE -> simpleInstruction("OP_CLOSE_UPVALUE", offset);
             case OpCode.RETURN -> simpleInstruction("OP_RETURN", offset);
             case OpCode.CLASS -> constantInstruction("OP_CLASS", chunk, offset);
+            case OpCode.METHOD -> constantInstruction("OP_METHOD", chunk, offset);
             default -> {
                 System.out.printf("Unknown opcode %d\n", instruction);
                 yield offset + 1;
@@ -100,6 +102,14 @@ public class Debugger {
         byte low = chunk.getCodeAt(offset + 2);
         short jump = (short) (high | low);
         System.out.printf("%-16s %4d -> %d\n", name, offset, offset + 3 + sign * jump);
+        return offset + 3;
+    }
+
+    private int invokeInstruction(String name, Chunk chunk, int offset) {
+        byte constant = chunk.getCodeAt(offset + 1);
+        byte argCount = chunk.getCodeAt(offset + 2);
+        Object constantValue = chunk.getConstantAt(constant);
+        System.out.printf("%-16s (%d args) %4d '%s'\n", name, argCount, constant, constantValue);
         return offset + 3;
     }
 }

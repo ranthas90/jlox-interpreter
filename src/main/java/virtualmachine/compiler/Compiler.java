@@ -17,6 +17,7 @@ public class Compiler {
     private Scanner scanner;
     private Parser parser;
     private LocalVarsEnvironment currentLocals;
+    private ClassCompiler currentClass;
     private Debugger debugger;
     private Map<TokenType, ParseRule> rules;
 
@@ -27,51 +28,52 @@ public class Compiler {
         parser = new Parser();
         debugger = new Debugger();
         currentLocals = new LocalVarsEnvironment(null, FunctionType.SCRIPT, null);
+        currentClass = null;
         initRules();
     }
 
     private void initRules() {
         rules = new HashMap<>();
-        addRule(LEFT_PAREN,     new GroupingParseFn(),  new CallParseFn(),      CALL);
-        addRule(RIGHT_PAREN,    null,                   null,                   NONE);
-        addRule(LEFT_BRACE,     null,                   null,                   NONE);
-        addRule(RIGHT_BRACE,    null,                   null,                   NONE);
-        addRule(COMMA,          null,                   null,                   NONE);
-        addRule(DOT,            null,                   new DotParseFn(),       CALL);
-        addRule(MINUS,          new UnaryParseFn(),     new BinaryParseFn(),    TERM);
-        addRule(PLUS,           null,                   new BinaryParseFn(),    TERM);
-        addRule(SEMICOLON,      null,                   null,                   NONE);
-        addRule(SLASH,          null,                   new BinaryParseFn(),    FACTOR);
-        addRule(STAR,           null,                   new BinaryParseFn(),    FACTOR);
-        addRule(BANG,           new UnaryParseFn(),     null,                   NONE);
-        addRule(BANG_EQUAL,     null,                   new BinaryParseFn(),    EQUALITY);
-        addRule(EQUAL,          null,                   null,                   NONE);
-        addRule(EQUAL_EQUAL,    null,                   new BinaryParseFn(),    COMPARISON);
-        addRule(GREATER,        null,                   new BinaryParseFn(),    COMPARISON);
-        addRule(GREATER_EQUAL,  null,                   new BinaryParseFn(),    COMPARISON);
-        addRule(LESS,           null,                   new BinaryParseFn(),    COMPARISON);
-        addRule(LESS_EQUAL,     null,                   new BinaryParseFn(),    COMPARISON);
-        addRule(IDENTIFIER,     new VariableParserFn(), null,                   NONE);
-        addRule(STRING,         new StringParseFn(),    null,                   NONE);
-        addRule(NUMBER,         new NumberParseFn(),    null,                   NONE);
-        addRule(TOKEN_AND,      null,                   new AndParseFn(),       AND);
-        addRule(CLASS,          null,                   null,                   NONE);
-        addRule(ELSE,           null,                   null,                   NONE);
-        addRule(FALSE,          new LiteralParseFn(),   null,                   NONE);
-        addRule(FOR,            null,                   null,                   NONE);
-        addRule(FUN,            null,                   null,                   NONE);
-        addRule(IF,             null,                   null,                   NONE);
-        addRule(NIL,            new LiteralParseFn(),   null,                   NONE);
-        addRule(TOKEN_OR,       null,                   null,                   NONE);
-        addRule(PRINT,          null,                   null,                   NONE);
-        addRule(RETURN,         null,                   null,                   NONE);
-        addRule(SUPER,          null,                   null,                   NONE);
-        addRule(THIS,           null,                   null,                   NONE);
-        addRule(TRUE,           new LiteralParseFn(),   null,                   NONE);
-        addRule(VAR,            null,                   null,                   NONE);
-        addRule(WHILE,          null,                   null,                   NONE);
-        addRule(ERROR,          null,                   null,                   NONE);
-        addRule(EOF,            null,                   null,                   NONE);
+        addRule(LEFT_PAREN, new GroupingParseFn(), new CallParseFn(), CALL);
+        addRule(RIGHT_PAREN, null, null, NONE);
+        addRule(LEFT_BRACE, null, null, NONE);
+        addRule(RIGHT_BRACE, null, null, NONE);
+        addRule(COMMA, null, null, NONE);
+        addRule(DOT, null, new DotParseFn(), CALL);
+        addRule(MINUS, new UnaryParseFn(), new BinaryParseFn(), TERM);
+        addRule(PLUS, null, new BinaryParseFn(), TERM);
+        addRule(SEMICOLON, null, null, NONE);
+        addRule(SLASH, null, new BinaryParseFn(), FACTOR);
+        addRule(STAR, null, new BinaryParseFn(), FACTOR);
+        addRule(BANG, new UnaryParseFn(), null, NONE);
+        addRule(BANG_EQUAL, null, new BinaryParseFn(), EQUALITY);
+        addRule(EQUAL, null, null, NONE);
+        addRule(EQUAL_EQUAL, null, new BinaryParseFn(), COMPARISON);
+        addRule(GREATER, null, new BinaryParseFn(), COMPARISON);
+        addRule(GREATER_EQUAL, null, new BinaryParseFn(), COMPARISON);
+        addRule(LESS, null, new BinaryParseFn(), COMPARISON);
+        addRule(LESS_EQUAL, null, new BinaryParseFn(), COMPARISON);
+        addRule(IDENTIFIER, new VariableParserFn(), null, NONE);
+        addRule(STRING, new StringParseFn(), null, NONE);
+        addRule(NUMBER, new NumberParseFn(), null, NONE);
+        addRule(TOKEN_AND, null, new AndParseFn(), AND);
+        addRule(CLASS, null, null, NONE);
+        addRule(ELSE, null, null, NONE);
+        addRule(FALSE, new LiteralParseFn(), null, NONE);
+        addRule(FOR, null, null, NONE);
+        addRule(FUN, null, null, NONE);
+        addRule(IF, null, null, NONE);
+        addRule(NIL, new LiteralParseFn(), null, NONE);
+        addRule(TOKEN_OR, null, null, NONE);
+        addRule(PRINT, null, null, NONE);
+        addRule(RETURN, null, null, NONE);
+        addRule(SUPER, null, null, NONE);
+        addRule(THIS, new ThisParseFn(), null, NONE);
+        addRule(TRUE, new LiteralParseFn(), null, NONE);
+        addRule(VAR, null, null, NONE);
+        addRule(WHILE, null, null, NONE);
+        addRule(ERROR, null, null, NONE);
+        addRule(EOF, null, null, NONE);
     }
 
     private void addRule(TokenType type, ParseFn prefix, ParseFn infix, int precedence) {
@@ -85,7 +87,7 @@ public class Compiler {
         scanner = new Scanner(source);
         advance();
 
-        while(!match(TokenType.EOF)) {
+        while (!match(TokenType.EOF)) {
             declaration();
         }
 
@@ -95,6 +97,10 @@ public class Compiler {
 
     public Parser getParser() {
         return parser;
+    }
+
+    public ClassCompiler getCurrentClass() {
+        return currentClass;
     }
 
     public ParseRule getRule(TokenType type) {
@@ -110,7 +116,7 @@ public class Compiler {
             classDeclaration();
         } else if (match(FUN)) {
             funDeclaration();
-        }else if (match(VAR)) {
+        } else if (match(VAR)) {
             varDeclaration();
         } else {
             statement();
@@ -155,7 +161,7 @@ public class Compiler {
     }
 
     public void block() {
-        while(!check(RIGHT_BRACE) && !check(EOF)) {
+        while (!check(RIGHT_BRACE) && !check(EOF)) {
             declaration();
         }
         consume(RIGHT_BRACE, "Expect '}' after block");
@@ -195,16 +201,40 @@ public class Compiler {
         }
     }
 
+    public void method() {
+        consume(IDENTIFIER, "Expect method name");
+        byte constant = identifierConstant(parser.getPrevious());
+
+        FunctionType functionType = FunctionType.METHOD;
+        String lexeme = (String) parser.getPrevious().getLexeme();
+        if ("init".equals(lexeme)) {
+            functionType = FunctionType.INITIALIZER;
+        }
+
+        function(functionType);
+        emitBytes(OpCode.METHOD, constant);
+    }
+
     public void classDeclaration() {
         consume(IDENTIFIER, "Expect class name");
+        Token className = parser.getPrevious();
         byte nameConstant = identifierConstant(parser.getPrevious());
         declareVariable();
 
         emitBytes(OpCode.CLASS, nameConstant);
         defineVariable(nameConstant);
 
+        ClassCompiler classCompiler = new ClassCompiler(currentClass);
+
+        namedVariable(className, false);
         consume(LEFT_BRACE, "Expect '{' before class body");
+        while (!check(RIGHT_BRACE) && !check(EOF)) {
+            method();
+        }
         consume(RIGHT_BRACE, "Expect '}' after class body");
+        emitByte(OpCode.POP);
+
+        currentClass = classCompiler.getEnclosing();
     }
 
     public void funDeclaration() {
@@ -301,6 +331,10 @@ public class Compiler {
         if (match(SEMICOLON)) {
             emitReturn();
         } else {
+            if (currentLocals.getType() == FunctionType.INITIALIZER) {
+                errorAt(parser.getPrevious(), "Can't return a value from an initializer");
+            }
+
             expression();
             consume(SEMICOLON, "Expect ';' after return value");
             emitByte(OpCode.RETURN);
@@ -463,7 +497,7 @@ public class Compiler {
             errorAt(parser.getPrevious(), "Too many constants in one chunk");
             constantIndex = 0;
         }
-        return (byte)constantIndex;
+        return (byte) constantIndex;
     }
 
     public void emitConstant(Object value) {
@@ -607,16 +641,24 @@ public class Compiler {
         parser.setPanicMode(false);
         while (parser.getCurrent().getType() != EOF) {
             if (parser.getPrevious().getType() == SEMICOLON) {
-                switch (parser.getCurrent().getType()) {
-                    case CLASS,FUN,VAR,FOR,IF,WHILE,PRINT,RETURN: return;
-                    default:;
-                }
-                advance();
+                return;
             }
+            switch (parser.getCurrent().getType()) {
+                case CLASS, FUN, VAR, FOR, IF, WHILE, PRINT, RETURN:
+                    return;
+                default:
+                    break;
+            }
+            advance();
         }
     }
 
     private void emitReturn() {
+        if (currentLocals.getType() == FunctionType.INITIALIZER) {
+            emitBytes(OpCode.GET_LOCAL, (byte) 0);
+        } else {
+            emitByte(OpCode.NIL);
+        }
         emitByte(OpCode.NIL);
         emitByte(OpCode.RETURN);
     }
@@ -641,7 +683,7 @@ public class Compiler {
         return currentLocals.getFunction().getChunk();
     }
 
-    private void errorAt(Token token, String message) {
+    public void errorAt(Token token, String message) {
         if (parser.isPanicMode()) {
             return;
         }

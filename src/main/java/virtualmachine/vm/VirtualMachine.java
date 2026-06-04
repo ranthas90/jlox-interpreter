@@ -63,22 +63,7 @@ public class VirtualMachine {
         CallFrame frame = frames[frameCount - 1];
         System.out.println("=== Running interpreter ===");
         while (true) {
-            // Print stack
-            /*
-            System.out.print("Stack   ::           ");
-            for (int i = 0; i < valueStackTop; i++) {
-                System.out.printf("[ %s ]", valueStack[i]);
-            }
-            System.out.println();
-
-            // Print globals
-            System.out.print("Globals ::           ");
-            globals.forEach((key, val) -> System.out.printf("[ %s :: %s ]", key, val));
-            System.out.println();
-
-            debugger.disassembleInstruction(frame.getClosure().getFunction().getChunk(), frame.getInstructionPointer());
-            System.out.println();
-             */
+            debug(frame);
             byte instruction;
             switch (instruction = readByte(frame)) {
                 case OpCode.CONSTANT -> pushValue(readConstant(frame));
@@ -146,8 +131,10 @@ public class VirtualMachine {
                         pushValue(instanceFieldValue); // Pushes instance field value
                         break;
                     }
-                    runtimeError(String.format("Undefined property '%s'", name));
-                    return InterpretResult.INTERPRET_RUNTIME_ERROR;
+
+                    if (!bindMethod(instance.getClazz(), name)) {
+                        return InterpretResult.INTERPRET_RUNTIME_ERROR;
+                    }
                 }
                 case OpCode.SET_PROPERTY -> {
                     // Cuando se ejecuta el SET_PROPERTY, en la cima de la pila tiene la instancia cuyo campo está
@@ -269,6 +256,14 @@ public class VirtualMachine {
                     }
                     frame = frames[frameCount - 1];
                 }
+                case OpCode.INVOKE -> {
+                    String method = readString(frame);
+                    int argCount = readByte(frame);
+                    if (!invoke(method, argCount)) {
+                        return InterpretResult.INTERPRET_RUNTIME_ERROR;
+                    }
+                    frame = frames[frameCount - 1];
+                }
                 case OpCode.CLOSURE -> {
                     Object function = readConstant(frame);
                     Closure closure = new Closure((Function) function);
@@ -301,6 +296,7 @@ public class VirtualMachine {
                     frame = frames[frameCount - 1];
                 }
                 case OpCode.CLASS -> pushValue(new ObjClass(readString(frame)));
+                case OpCode.METHOD -> defineMethod(readString(frame));
             }
         }
     }
@@ -358,9 +354,22 @@ public class VirtualMachine {
     }
 
     private boolean callValue(Object callee, int argCount) {
-        if (callee instanceof ObjClass) {
-            ObjInstance instance = new ObjInstance((ObjClass) callee);
+        if (callee instanceof BoundMethod) {
+            BoundMethod boundMethod = (BoundMethod)  callee;
+            valueStack[valueStackTop - 1 - argCount] = boundMethod.getReceiver();
+            return call(boundMethod.getMethod(), argCount);
+        } else if (callee instanceof ObjClass) {
+            ObjClass clazz = (ObjClass)  callee;
+            ObjInstance instance = new ObjInstance(clazz);
             valueStack[valueStackTop - 1 - argCount] = instance;
+
+            Closure initializer = clazz.getMethod("init");
+            if (initializer != null) {
+                return call(initializer, argCount);
+            } else if (argCount != 0) {
+                runtimeError("Expected 0 arguments but got " + argCount);
+                return false;
+            }
             return true;
         } else if (callee instanceof Closure) {
             return call((Closure) callee, argCount);
@@ -374,6 +383,47 @@ public class VirtualMachine {
         }
         runtimeError("Can only call functions and classes");
         return false;
+    }
+
+    private boolean invokeFromClass(ObjClass clazz, String name, int argCount) {
+        Closure method = clazz.getMethod(name);
+        if (method == null) {
+            runtimeError("Undefined property '" + name + "'");
+            return false;
+        }
+        return call(method, argCount);
+    }
+
+    private boolean invoke(String name, int argCount) {
+        Object receiver = peekValue(argCount);
+
+        if (!(receiver instanceof ObjInstance)) {
+            runtimeError("Only instances have methods");
+            return false;
+        }
+
+        ObjInstance instance = (ObjInstance) receiver;
+        Object value = instance.getFieldByName(name);
+        if (value != null) {
+            valueStack[valueStackTop - 1 - argCount] = value;
+            return callValue(value, argCount);
+        }
+
+        return invokeFromClass(instance.getClazz(), name, argCount);
+    }
+
+    private boolean bindMethod(ObjClass clazz, String name) {
+        Closure method = clazz.getMethod(name);
+        if (method == null) {
+            runtimeError(String.format("Undefined property '%s'", name));
+            return false;
+        }
+
+        BoundMethod boundMethod = new BoundMethod(peekValue(0), method);
+
+        popValue();
+        pushValue(boundMethod);
+        return true;
     }
 
     private Upvalue captureUpvalue(int location) {
@@ -408,6 +458,13 @@ public class VirtualMachine {
             openUpvalues = upvalue.getNext();
             upvalue.setNext(null);
         }
+    }
+
+    private void defineMethod(String name) {
+        Closure method = (Closure) peekValue(0);
+        ObjClass clazz = (ObjClass) peekValue(1);
+        clazz.addMethod(name, method);
+        popValue();
     }
 
     private void resetValueStack() {
@@ -455,5 +512,21 @@ public class VirtualMachine {
 
     private String readString(CallFrame frame) {
         return (String) readConstant(frame);
+    }
+
+    private void debug(CallFrame frame) {
+        System.out.print("Stack   ::           ");
+        for (int i = 0; i < valueStackTop; i++) {
+            System.out.printf("[ %s ]", valueStack[i]);
+        }
+        System.out.println();
+
+        // Print globals
+        System.out.print("Globals ::           ");
+        globals.forEach((key, val) -> System.out.printf("[ %s :: %s ]", key, val));
+        System.out.println();
+
+        debugger.disassembleInstruction(frame.getClosure().getFunction().getChunk(), frame.getInstructionPointer());
+        System.out.println();
     }
 }

@@ -1,5 +1,5 @@
 package virtualmachine.compiler;
 
 public enum FunctionType {
-    FUNCTION, SCRIPT
+    FUNCTION, SCRIPT, METHOD, INITIALIZER
 }

@@ -13,6 +13,10 @@ public class ObjInstance {
         this.fields = new HashMap<>();
     }
 
+    public ObjClass getClazz() {
+        return clazz;
+    }
+
     public Object getFieldByName(String fieldName) {
         return fields.get(fieldName);
     }
