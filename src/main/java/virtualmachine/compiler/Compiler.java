@@ -224,7 +224,7 @@ public class Compiler {
         emitBytes(OpCode.CLASS, nameConstant);
         defineVariable(nameConstant);
 
-        ClassCompiler classCompiler = new ClassCompiler(currentClass);
+        currentClass = new ClassCompiler(currentClass);
 
         namedVariable(className, false);
         consume(LEFT_BRACE, "Expect '{' before class body");
@@ -234,7 +234,7 @@ public class Compiler {
         consume(RIGHT_BRACE, "Expect '}' after class body");
         emitByte(OpCode.POP);
 
-        currentClass = classCompiler.getEnclosing();
+        currentClass = currentClass.getEnclosing();
     }
 
     public void funDeclaration() {
@@ -553,7 +553,12 @@ public class Compiler {
     }
 
     private boolean identifiersEqual(Token a, Token b) {
-        return a.getLexeme().equals(b.getLexeme()); // TODO: mejorar esto!!!!
+        if (b.getLexeme() == null) {
+            if (a.getLexeme() == null) {
+                return false;
+            }
+        }
+        return b.getLexeme().equals(a.getLexeme()); // TODO: mejorar esto!!!!
     }
 
     private int resolveLocal(LocalVarsEnvironment localVarsEnvironment, Token name) {
