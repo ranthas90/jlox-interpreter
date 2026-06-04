@@ -63,7 +63,7 @@ public class VirtualMachine {
         CallFrame frame = frames[frameCount - 1];
         System.out.println("=== Running interpreter ===");
         while (true) {
-            debug(frame);
+            //debug(frame);
             byte instruction;
             switch (instruction = readByte(frame)) {
                 case OpCode.CONSTANT -> pushValue(readConstant(frame));

@@ -664,7 +664,6 @@ public class Compiler {
         } else {
             emitByte(OpCode.NIL);
         }
-        emitByte(OpCode.NIL);
         emitByte(OpCode.RETURN);
     }
 

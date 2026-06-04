@@ -119,7 +119,7 @@ public class Scanner {
             return token(IDENTIFIER, text);
         }
 
-        return token(type);
+        return token(type, text); // TODO: CAMBIO YA QUE ASUMIMOS QUE LEXEMA = LITERAL
     }
 
     private Token number() {
