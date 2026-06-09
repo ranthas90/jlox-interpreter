@@ -16,6 +16,7 @@ public class MainWindow extends JFrame {
     private TopPanel topPanel;
     private LeftPanel leftPanel;
     private RightPanel rightPanel;
+    private BottomPanel bottomPanel;
 
     public MainWindow() {
 
@@ -30,7 +31,7 @@ public class MainWindow extends JFrame {
 
         setTitle("JLox interpreter (v1.0.0)");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setSize(800, 600);
+        setSize(1200, 800);
         setLocationRelativeTo(null);
     }
 
@@ -44,16 +45,11 @@ public class MainWindow extends JFrame {
 
         JPanel main = new JPanel(new BorderLayout());
 
-        // Top panel
         topPanel = new TopPanel();
+        bottomPanel = new BottomPanel();
 
-        // Content panel
         JPanel content = new JPanel(new GridLayout(1, 2));
-
-        // Left panel
         leftPanel = new LeftPanel();
-
-        // Right panel
         rightPanel = new RightPanel();
 
         content.add(leftPanel);
@@ -61,6 +57,7 @@ public class MainWindow extends JFrame {
 
         main.add(topPanel, BorderLayout.PAGE_START);
         main.add(content, BorderLayout.CENTER);
+        main.add(bottomPanel, BorderLayout.PAGE_END);
 
         this.getContentPane().add(main, BorderLayout.CENTER);
     }

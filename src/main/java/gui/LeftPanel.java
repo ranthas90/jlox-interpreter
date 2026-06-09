@@ -14,7 +14,7 @@ public class LeftPanel extends JPanel {
 
     private void createCodeTextArea() {
         codeTextArea = new JTextArea("Select a file to view/edit its code or write your lox script");
-        codeTextArea.setFont(new Font("Jetbrains Mono", Font.PLAIN, 14));
+        codeTextArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 14));
         codeTextArea.setTabSize(4);
         codeTextArea.setLineWrap(false);
     }
