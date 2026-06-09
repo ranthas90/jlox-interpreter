@@ -8,13 +8,15 @@ public class MainToolBar extends JToolBar {
     private JButton openFileButton = new JButton();
     private JButton openFolderButton = new JButton();
     private JButton runCodeButton = new JButton();
+    private JButton clearCodeButton = new JButton();
 
-    public MainToolBar(ButtonConfig openFile, ButtonConfig openFolder, ButtonConfig runCode) {
+    public MainToolBar() {
         setFloatable(false);
-        createButton(openFileButton, openFile);
-        createButton(openFolderButton, openFolder);
+        createButton(openFileButton, "/images/new-document.png", "Open file");
+        createButton(openFolderButton, "/images/open-folder.png", "Open folder");
         addSeparator();
-        createButton(runCodeButton, runCode);
+        createButton(runCodeButton, "/images/play-button.png", "Run code");
+        createButton(clearCodeButton, "/images/recycle-bin.png", "Clear code");
 
         // TODO: Ya veremos que hago con este botón
         openFolderButton.addActionListener(e -> {
@@ -26,9 +28,9 @@ public class MainToolBar extends JToolBar {
         });
     }
 
-    private void createButton(JButton button, ButtonConfig config) {
+    private void createButton(JButton button, String imagePath, String altText) {
         // TODO: check null due to image not found
-        ImageIcon icon = new ImageIcon(MainWindow.class.getResource(config.imagePath()));
+        ImageIcon icon = new ImageIcon(MainWindow.class.getResource(imagePath));
         double maxSize = 16.0D;
 
         int width = icon.getIconWidth();
@@ -38,7 +40,7 @@ public class MainToolBar extends JToolBar {
         int newWidth = (int) (width * scale);
         int newHeight = (int) (height * scale);
         Image scaledIcon = icon.getImage().getScaledInstance(newWidth, newHeight, Image.SCALE_SMOOTH);
-        ImageIcon buttonIcon = new ImageIcon(scaledIcon, config.altText());
+        ImageIcon buttonIcon = new ImageIcon(scaledIcon, altText);
         button.setIcon(buttonIcon);
 
         add(button);
@@ -50,5 +52,9 @@ public class MainToolBar extends JToolBar {
 
     public JButton getRunCodeButton() {
         return runCodeButton;
+    }
+
+    public JButton getClearCodeButton() {
+        return clearCodeButton;
     }
 }

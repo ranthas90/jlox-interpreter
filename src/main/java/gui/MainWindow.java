@@ -12,6 +12,7 @@ import java.util.List;
 public class MainWindow extends JFrame {
 
     private MainToolBar mainToolBar;
+    private TopPanel topPanel;
     private LeftPanel leftPanel;
     private RightPanel rightPanel;
 
@@ -22,6 +23,7 @@ public class MainWindow extends JFrame {
 
         addOpenFileActionListener();
         addRunCodeActionListener();
+        addClearCodeActionListener();
 
         setTitle("JLox interpreter (v1.0.0)");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -30,20 +32,20 @@ public class MainWindow extends JFrame {
     }
 
 
-
-
     private void createToolBar() {
-        ButtonConfig openFileConfig = new ButtonConfig("/images/new-document.png", "Open file");
-        ButtonConfig openFolderConfig = new ButtonConfig("/images/open-folder.png", "Open folder");
-        ButtonConfig runCodeConfig = new ButtonConfig("/images/play-button.png", "Run code");
-
-        mainToolBar = new MainToolBar(openFileConfig, openFolderConfig, runCodeConfig);
+        mainToolBar = new MainToolBar();
         this.getContentPane().add(mainToolBar, BorderLayout.PAGE_START);
     }
 
     private void createMainPanel() {
 
-        JPanel main = new JPanel(new GridLayout(1, 2));
+        JPanel main = new JPanel(new BorderLayout());
+
+        // Top panel
+        topPanel = new TopPanel();
+
+        // Content panel
+        JPanel content = new JPanel(new GridLayout(1, 2));
 
         // Left panel
         leftPanel = new LeftPanel();
@@ -51,20 +53,12 @@ public class MainWindow extends JFrame {
         // Right panel
         rightPanel = new RightPanel();
 
-        JPanel right = new JPanel(new GridLayout(2, 1));
-        JPanel rightTop = new JPanel();
-        rightTop.setBorder(BorderFactory.createTitledBorder("Disassembler window"));
-        rightTop.add(new JButton("Disassembler"));
+        content.add(leftPanel);
+        content.add(rightPanel);
 
-        JPanel rightBottom = new JPanel();
-        rightBottom.setBorder(BorderFactory.createTitledBorder("Output window"));
-        rightBottom.add(new JButton("Output"));
+        main.add(topPanel, BorderLayout.PAGE_START);
+        main.add(content, BorderLayout.CENTER);
 
-        right.add(rightTop);
-        right.add(rightBottom);
-
-        main.add(leftPanel);
-        main.add(rightPanel);
         this.getContentPane().add(main, BorderLayout.CENTER);
     }
 
@@ -94,6 +88,12 @@ public class MainWindow extends JFrame {
             // TODO: copia el contenido de left panel, y lo pasa al AST/VM para su ejecución.
             // TODO: el resultado de los dos se muestra en la ventana de output
             // TODO: El disassembler deberá mostrar el resultado en la ventana correspondiente
+        });
+    }
+
+    private void addClearCodeActionListener() {
+        mainToolBar.getClearCodeButton().addActionListener(actionListener -> {
+            leftPanel.getCodeTextArea().setText("");
         });
     }
 }
