@@ -5,6 +5,7 @@ import virtualmachine.vm.VirtualMachine;
 import javax.swing.*;
 import java.awt.*;
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.List;
@@ -22,7 +23,9 @@ public class MainWindow extends JFrame {
         createMainPanel();
 
         addOpenFileActionListener();
+        addSaveFileActionListener();
         addRunCodeActionListener();
+        addDebugCodeActionListener();
         addClearCodeActionListener();
 
         setTitle("JLox interpreter (v1.0.0)");
@@ -74,7 +77,23 @@ public class MainWindow extends JFrame {
                     List<String> lines = Files.readAllLines(file.toPath());
                     leftPanel.getCodeTextArea().setText(String.join("\r\n", lines));
                 } catch (IOException e) {
-                    throw new RuntimeException(e);
+                    new ErrorAlert(e.getMessage());
+                }
+            }
+        });
+    }
+
+    private void addSaveFileActionListener() {
+        mainToolBar.getSaveFileButton().addActionListener(actionListener -> {
+            JFileChooser fileChooser = new JFileChooser();
+            fileChooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
+            int returnValue = fileChooser.showSaveDialog(this.getContentPane());
+            if (returnValue == JFileChooser.APPROVE_OPTION) {
+                try (FileWriter fw = new FileWriter(fileChooser.getSelectedFile() + ".lox")) {
+                    fw.write(leftPanel.getCodeTextArea().getText());
+                    new SuccessAlert("File saved successfully");
+                } catch (IOException e) {
+                    new ErrorAlert(e.getMessage());
                 }
             }
         });
@@ -87,7 +106,16 @@ public class MainWindow extends JFrame {
             vm.interpret(sourceCode);
             // TODO: copia el contenido de left panel, y lo pasa al AST/VM para su ejecución.
             // TODO: el resultado de los dos se muestra en la ventana de output
-            // TODO: El disassembler deberá mostrar el resultado en la ventana correspondiente
+            // TODO: esta ejecución no usará el flag de debug!!!!
+        });
+    }
+
+    private void addDebugCodeActionListener() {
+        mainToolBar.getDebugCodeButton().addActionListener(actionListener -> {
+            String sourceCode = leftPanel.getCodeTextArea().getText();
+            VirtualMachine vm = new VirtualMachine();
+            vm.interpret(sourceCode);
+            // TODO: esta ejecución marca el flag de debug, así que tenemos que mostrar en la ventana de disassembly los chunks pila y demás
         });
     }
 

@@ -7,15 +7,19 @@ public class MainToolBar extends JToolBar {
 
     private JButton openFileButton = new JButton();
     private JButton openFolderButton = new JButton();
+    private JButton saveFileButton = new JButton();
     private JButton runCodeButton = new JButton();
+    private JButton debugCodeButton = new JButton();
     private JButton clearCodeButton = new JButton();
 
     public MainToolBar() {
         setFloatable(false);
         createButton(openFileButton, "/images/new-document.png", "Open file");
         createButton(openFolderButton, "/images/open-folder.png", "Open folder");
+        createButton(saveFileButton, "/images/diskette.png", "Save file");
         addSeparator();
         createButton(runCodeButton, "/images/play-button.png", "Run code");
+        createButton(debugCodeButton, "/images/bug.png", "Debug code");
         createButton(clearCodeButton, "/images/recycle-bin.png", "Clear code");
 
         // TODO: Ya veremos que hago con este botón
@@ -42,6 +46,7 @@ public class MainToolBar extends JToolBar {
         Image scaledIcon = icon.getImage().getScaledInstance(newWidth, newHeight, Image.SCALE_SMOOTH);
         ImageIcon buttonIcon = new ImageIcon(scaledIcon, altText);
         button.setIcon(buttonIcon);
+        button.setToolTipText(altText);
 
         add(button);
     }
@@ -50,8 +55,16 @@ public class MainToolBar extends JToolBar {
         return openFileButton;
     }
 
+    public JButton getSaveFileButton() {
+        return saveFileButton;
+    }
+
     public JButton getRunCodeButton() {
         return runCodeButton;
+    }
+
+    public JButton getDebugCodeButton() {
+        return debugCodeButton;
     }
 
     public JButton getClearCodeButton() {
